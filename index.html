@@ -1,0 +1,1426 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>拉氏圖 (Ramachandran Plot) 3D 互動教學實驗室</title>
+    <style>
+        :root {
+            --bg-main: #f1f5f9;
+            --bg-card: #ffffff;
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --border-color: #e2e8f0;
+            --accent-blue: #2563eb;
+            --accent-green: #059669;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans TC", sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-primary);
+            line-height: 1.55;
+            padding-bottom: 48px;
+        }
+
+        /* 頂部標題列 */
+        header {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #ffffff;
+            padding: 18px 24px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.12);
+        }
+        .header-inner {
+            max-width: 1440px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        header h1 { font-size: 1.45rem; letter-spacing: 0.5px; }
+        header .subtitle { color: #94a3b8; font-size: 0.9rem; margin-top: 2px; }
+
+        /* 主容器：最大寬度 1440px，適合桌面寬螢幕並排對照 */
+        .wrapper {
+            max-width: 1440px;
+            margin: 20px auto 0;
+            padding: 0 20px;
+        }
+
+        /* 零基礎互動任務導覽列 (參考 molvis/phipsi 引導式體驗) */
+        .quest-banner {
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            border-left: 5px solid #2563eb;
+            border-radius: 10px;
+            padding: 16px 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+        }
+        .quest-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .quest-header h2 { font-size: 1.05rem; color: #1e3a8a; }
+        .quest-steps {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+        }
+        @media (max-width: 1100px) { .quest-steps { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 640px) { .quest-steps { grid-template-columns: 1fr; } }
+
+        .quest-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.18s ease;
+            text-align: left;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .quest-card:hover {
+            border-color: #3b82f6;
+            background: #eff6ff;
+            transform: translateY(-2px);
+        }
+        .quest-card.active-quest {
+            border-color: #2563eb;
+            background: #eff6ff;
+            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+        }
+        .quest-tag {
+            display: inline-block;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: #2563eb;
+            background: #dbeafe;
+            padding: 2px 8px;
+            border-radius: 99px;
+            margin-bottom: 6px;
+            width: fit-content;
+        }
+        .quest-card h3 { font-size: 0.92rem; color: #0f172a; margin-bottom: 4px; }
+        .quest-card p { font-size: 0.82rem; color: #475569; line-height: 1.45; }
+
+        /* 核心三欄工作區：左(3D分子) | 中(高清拉氏圖+狀態) | 右(控制盤) */
+        .workspace-grid {
+            display: grid;
+            grid-template-columns: 1.05fr 1.05fr 0.85fr;
+            gap: 18px;
+            align-items: start;
+        }
+        @media (max-width: 1240px) {
+            .workspace-grid { grid-template-columns: 1fr 1fr; }
+            .control-col { grid-column: span 2; }
+        }
+        @media (max-width: 820px) {
+            .workspace-grid { grid-template-columns: 1fr; }
+            .control-col { grid-column: span 1; }
+        }
+
+        .card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 18px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
+            margin-bottom: 18px;
+        }
+        .card:last-child { margin-bottom: 0; }
+
+        .card-title-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #f1f5f9;
+            padding-bottom: 10px;
+            margin-bottom: 12px;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .card-title-row h2 { font-size: 1.08rem; color: #0f172a; }
+
+        .hint {
+            font-size: 0.84rem;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+
+        /* 3D 畫布與懸浮標籤 */
+        .three-wrapper {
+            position: relative;
+            width: 100%;
+            height: 430px;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid #cbd5e1;
+            background: radial-gradient(circle at center, #1e293b 0%, #090d16 100%);
+        }
+        #threeContainer { width: 100%; height: 100%; cursor: grab; }
+        #threeContainer:active { cursor: grabbing; }
+
+        /* 3D 畫面上的白話文浮動解說框 */
+        .overlay-caption {
+            position: absolute;
+            bottom: 12px;
+            left: 12px;
+            right: 12px;
+            background: rgba(15, 23, 42, 0.82);
+            backdrop-filter: blur(6px);
+            color: #f8fafc;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 0.84rem;
+            border: 1px solid rgba(255,255,255,0.12);
+            pointer-events: none;
+        }
+
+        .atom-legend {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px 14px;
+            margin-top: 12px;
+            padding-top: 10px;
+            border-top: 1px dashed #e2e8f0;
+            font-size: 0.8rem;
+            color: #475569;
+        }
+        .atom-legend span { display: flex; align-items: center; gap: 5px; }
+        .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+        .dot.c-alpha { background: #334155; border: 1px solid #94a3b8; }
+        .dot.c-carb { background: #64748b; }
+        .dot.n-atom { background: #2563eb; }
+        .dot.o-atom { background: #ef4444; }
+        .dot.h-atom { background: #f8fafc; border: 1px solid #94a3b8; }
+        .dot.r-atom { background: #f59e0b; }
+
+        /* 高清拉氏圖容器 */
+        .rama-wrapper {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #ffffff;
+        }
+        canvas#ramaCanvas {
+            width: 100%;
+            max-width: 450px;
+            aspect-ratio: 1 / 1;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            cursor: crosshair;
+            display: block;
+        }
+
+        /* 移至拉氏圖正下方的狀態判定區塊 */
+        .status-panel {
+            margin-top: 14px;
+            padding: 12px 14px;
+            border-radius: 8px;
+            border: 1px solid transparent;
+            transition: all 0.2s ease;
+        }
+        .status-panel.safe {
+            background-color: #f0fdf4;
+            border-color: #86efac;
+            color: #14532d;
+        }
+        .status-panel.allowed {
+            background-color: #fefce8;
+            border-color: #fde047;
+            color: #713f12;
+        }
+        .status-panel.clash {
+            background-color: #fef2f2;
+            border-color: #fca5a5;
+            color: #7f1d1d;
+        }
+        .status-title {
+            font-weight: 700;
+            font-size: 0.95rem;
+            margin-bottom: 3px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .status-desc {
+            font-size: 0.84rem;
+            opacity: 0.92;
+        }
+
+        .legend-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+            justify-content: center;
+        }
+        .badge { font-size: 0.78rem; padding: 3px 8px; border-radius: 4px; font-weight: 600; }
+        .badge.favored { background: #93c5fd; color: #1e3a8a; border: 1px solid #3b82f6; }
+        .badge.allowed-pro { background: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc; }
+        .badge.beta { background: #bbf7d0; color: #14532d; border: 1px solid #4ade80; }
+        .badge.alpha-r { background: #bfdbfe; color: #1e3a8a; border: 1px solid #60a5fa; }
+        .badge.alpha-l { background: #ddd6fe; color: #4c1d95; border: 1px solid #a78bfa; }
+
+        /* 控制滑桿與按鈕 */
+        .slider-box {
+            background: #f8fafc;
+            padding: 12px 14px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            margin-bottom: 12px;
+        }
+        .slider-box.phi-box { border-left: 4px solid #3b82f6; }
+        .slider-box.psi-box { border-left: 4px solid #10b981; }
+        .slider-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+            font-size: 0.92rem;
+        }
+        .angle-badge {
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+        }
+        input[type="range"] { width: 100%; cursor: pointer; }
+        .phi-box input[type="range"] { accent-color: #2563eb; }
+        .psi-box input[type="range"] { accent-color: #059669; }
+        .slider-sub { font-size: 0.78rem; color: #64748b; margin-top: 4px; }
+
+        select {
+            width: 100%;
+            margin-top: 6px;
+            padding: 9px 10px;
+            border-radius: 8px;
+            border: 1px solid #94a3b8;
+            font-size: 0.9rem;
+            background-color: #ffffff;
+            color: #0f172a;
+        }
+
+        .preset-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+        .preset-btn {
+            padding: 9px 8px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            background-color: #f8fafc;
+            color: #1e293b;
+            font-weight: 600;
+            font-size: 0.86rem;
+            cursor: pointer;
+            transition: all 0.15s;
+            text-align: center;
+        }
+        .preset-btn:hover { background-color: #e2e8f0; border-color: #94a3b8; }
+        .preset-btn small { display: block; font-weight: normal; color: #64748b; font-size: 0.76rem; margin-top: 2px; }
+        .preset-btn.danger {
+            grid-column: span 2;
+            background-color: #fff1f2;
+            border-color: #fecdd3;
+            color: #be123c;
+        }
+        .preset-btn.danger:hover { background-color: #ffe4e6; }
+
+        .mini-btn {
+            padding: 4px 10px;
+            font-size: 0.78rem;
+            background-color: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            cursor: pointer;
+            color: #334155;
+            font-weight: 600;
+        }
+        .mini-btn:hover { background-color: #e2e8f0; }
+
+        .mode-switch {
+            display: inline-flex;
+            background: #e2e8f0;
+            padding: 3px;
+            border-radius: 7px;
+        }
+        .mode-btn {
+            padding: 3px 9px;
+            font-size: 0.76rem;
+            border: none;
+            border-radius: 5px;
+            background: transparent;
+            color: #475569;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        .mode-btn.active {
+            background: #ffffff;
+            color: #0f172a;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+    </style>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+    <header>
+        <div class="header-inner">
+            <div>
+                <h1>拉氏圖 (Ramachandran Plot) 零基礎 3D 互動實驗室</h1>
+                <p class="subtitle">參考 MolVis φ/ψ 教學架構：不用背化學公式，跟著下方 4 個互動小任務點一遍就完全搞懂</p>
+            </div>
+        </div>
+    </header>
+
+    <div class="wrapper">
+        <!-- 零基礎四步互動引導卡 (參考 bioinformatics.org/molvis/phipsi/) -->
+        <section class="quest-banner">
+            <div class="quest-header">
+                <h2>新手互動導覽：依序點擊這 4 張卡片，3 分鐘徹底看懂拉氏圖</h2>
+                <span style="font-size: 0.82rem; color: #64748b;">點擊卡片會自動設定角度並提示你該看哪裡</span>
+            </div>
+            <div class="quest-steps">
+                <div class="quest-card active-quest" id="quest1">
+                    <div>
+                        <span class="quest-tag">第 1 步：認識關節</span>
+                        <h3>兩片不會彎的「硬紙板」</h3>
+                    </div>
+                    <p>蛋白質骨幹由一節節<strong>平面的胜肽鍵</strong>（藍板與綠板）組成，只有中間黑球 <strong>Cα</strong> 能像門軸一樣轉動。左右旋轉角就是 <strong>φ</strong> 與 <strong>ψ</strong>。</p>
+                </div>
+                <div class="quest-card" id="quest2">
+                    <div>
+                        <span class="quest-tag">第 2 步：製造撞車</span>
+                        <h3>為什麼圖上大部分是白的？</h3>
+                    </div>
+                    <p>點我把角度調成 <strong>(0°, 0°)</strong>！觀察 3D 裡兩邊的原子直接撞在一起（紅光警告）。白色區域就是「物理上轉不過去的禁區」。</p>
+                </div>
+                <div class="quest-card" id="quest3">
+                    <div>
+                        <span class="quest-tag">第 3 步：認識安全島</span>
+                        <h3>色塊＝蛋白質形狀身分證</h3>
+                    </div>
+                    <p>點我跳到<strong>右手 α-螺旋 (-57°, -47°)</strong>！既不撞車又能排隊牽手（形成氫鍵）的角度，會集中成左下（螺旋）與左上（摺疊）的藍色島嶼。</p>
+                </div>
+                <div class="quest-card" id="quest4">
+                    <div>
+                        <span class="quest-tag">第 4 步：特例大考驗</span>
+                        <h3>最軟 Q 與最僵硬的胺基酸</h3>
+                    </div>
+                    <p>點我切換成<strong>脯胺酸 (Proline)</strong>！它的金色側鏈繞回來把左側鎖成死環，導致 φ 角無法轉動，安全區瞬間縮成一條垂直窄帶。</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 三欄主工作區 -->
+        <main class="workspace-grid">
+            <!-- 左欄：3D 互動分子模型 -->
+            <section class="card">
+                <div class="card-title-row">
+                    <h2>1. 3D 蛋白質骨架與旋轉軸</h2>
+                    <div style="display:flex; gap:6px;">
+                        <button id="togglePlanesBtn" class="mini-btn">隱藏硬紙板</button>
+                        <button id="resetCamBtn" class="mini-btn">重設視角</button>
+                    </div>
+                </div>
+                <p class="hint"><strong>左鍵拖曳</strong>旋轉視角、<strong>滾輪</strong>縮放。藍色虛線是 <strong>φ 轉軸</strong>，綠色虛線是 <strong>ψ 轉軸</strong>。</p>
+
+                <div class="three-wrapper">
+                    <div id="threeContainer"></div>
+                    <div class="overlay-caption" id="threeCaption">
+                        💡 <strong>觀察重點：</strong>試著拖動右側的 φ 或 ψ 滑桿，你會看到藍色或綠色板塊繞著對應顏色的虛線軸旋轉，但板塊本身永遠保持平整。
+                    </div>
+                </div>
+
+                <div class="atom-legend">
+                    <span><i class="dot c-alpha"></i>Cα 中心關節</span>
+                    <span><i class="dot c-carb"></i>碳 (C)</span>
+                    <span><i class="dot n-atom"></i>氮 (N)</span>
+                    <span><i class="dot o-atom"></i>氧 (O)</span>
+                    <span><i class="dot h-atom"></i>氫 (H)</span>
+                    <span><i class="dot r-atom"></i>側鏈 (R基)</span>
+                </div>
+            </section>
+
+            <!-- 中欄：4K 高清拉氏圖 + 狀態判定區塊（修正歸屬位置） -->
+            <section class="card">
+                <div class="card-title-row">
+                    <h2>2. 拉氏圖 (Ramachandran Plot)</h2>
+                    <div class="mode-switch">
+                        <button id="modeProBtn" class="mode-btn active">真實等高線</button>
+                        <button id="modeSimpleBtn" class="mode-btn">入門色塊</button>
+                    </div>
+                </div>
+                <p class="hint">可<strong>直接在圖上點擊或拖曳紅點</strong>，左側 3D 分子會同步即時轉動！</p>
+
+                <div class="rama-wrapper">
+                    <canvas id="ramaCanvas"></canvas>
+                </div>
+
+                <!-- 狀態判定區塊：現在正確放置在拉氏圖正下方 -->
+                <div id="statusPanel" class="status-panel safe">
+                    <div class="status-title" id="statusTitle">✅ 最有利核心區 (Favored) — 右手 α-螺旋</div>
+                    <div class="status-desc" id="statusDesc">此角度完全沒有原子碰撞，且最利於形成穩定的蛋白質螺旋結構。</div>
+                </div>
+
+                <div class="legend-row" id="plotLegend">
+                    <span class="badge favored">深藍實線內：最有利核心區 (Favored)</span>
+                    <span class="badge allowed-pro">淺藍外圈內：額外容許區 (Allowed)</span>
+                </div>
+            </section>
+
+            <!-- 右欄：滑桿控制與二級結構預設 -->
+            <section class="control-col">
+                <div class="card">
+                    <div class="card-title-row">
+                        <h2>3. 轉動關節與切換胺基酸</h2>
+                    </div>
+
+                    <div class="slider-box phi-box">
+                        <div class="slider-header">
+                            <span><strong>φ (Phi) 角</strong>（藍色轉軸）</span>
+                            <span class="angle-badge" id="phiVal">-57°</span>
+                        </div>
+                        <input type="range" id="phiSlider" min="-180" max="180" value="-57">
+                        <div class="slider-sub">控制左側「氮(N) - Cα」之間的旋轉角度</div>
+                    </div>
+
+                    <div class="slider-box psi-box">
+                        <div class="slider-header">
+                            <span><strong>ψ (Psi) 角</strong>（綠色轉軸）</span>
+                            <span class="angle-badge" id="psiVal">-47°</span>
+                        </div>
+                        <input type="range" id="psiSlider" min="-180" max="180" value="-47">
+                        <div class="slider-sub">控制右側「Cα - 碳(C)」之間的旋轉角度</div>
+                    </div>
+
+                    <div style="margin-top: 14px;">
+                        <label for="aaType" style="font-size: 0.88rem; font-weight: 700; color: #334155;">切換胺基酸種類（觀察安全區變化）：</label>
+                        <select id="aaType">
+                            <option value="general">一般胺基酸（如丙胺酸 Alanine - 標準規則）</option>
+                            <option value="glycine">甘胺酸 (Glycine - 側鏈最小，自由度超高)</option>
+                            <option value="proline">脯胺酸 (Proline - 關節被五元環鎖死)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title-row">
+                        <h2>4. 一鍵跳轉常見蛋白質形狀</h2>
+                    </div>
+                    <div class="preset-grid">
+                        <button class="preset-btn" id="btnAlphaR">右手 α-螺旋<small>φ=-57°, ψ=-47°</small></button>
+                        <button class="preset-btn" id="btnBetaAnti">反平行 β-摺疊<small>φ=-139°, ψ=+135°</small></button>
+                        <button class="preset-btn" id="btnBetaPara">平行 β-摺疊<small>φ=-119°, ψ=+113°</small></button>
+                        <button class="preset-btn" id="btnPPII">膠原蛋白 PPII<small>φ=-75°, ψ=+145°</small></button>
+                        <button class="preset-btn" id="btnAlpha310">3₁₀-螺旋<small>φ=-49°, ψ=-26°</small></button>
+                        <button class="preset-btn" id="btnAlphaL">左手 α-螺旋<small>φ=+57°, ψ=+47°</small></button>
+                        <button class="preset-btn danger" id="btnClash">⚠ 故意撞車測試 (φ=0°, ψ=0°)<small>直接轉進白色禁區，觀察原子碰撞警告</small></button>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script type="module">
+        // ==========================================
+        // 1. UI 元素與狀態變數
+        // ==========================================
+        const threeContainer = document.getElementById('threeContainer');
+        const threeCaption = document.getElementById('threeCaption');
+        const ramaCanvas = document.getElementById('ramaCanvas');
+        const rCtx = ramaCanvas.getContext('2d');
+
+        const phiSlider = document.getElementById('phiSlider');
+        const psiSlider = document.getElementById('psiSlider');
+        const phiVal = document.getElementById('phiVal');
+        const psiVal = document.getElementById('psiVal');
+        const aaSelect = document.getElementById('aaType');
+
+        const statusPanel = document.getElementById('statusPanel');
+        const statusTitle = document.getElementById('statusTitle');
+        const statusDesc = document.getElementById('statusDesc');
+
+        const modeProBtn = document.getElementById('modeProBtn');
+        const modeSimpleBtn = document.getElementById('modeSimpleBtn');
+        const plotLegend = document.getElementById('plotLegend');
+
+        let currentPhi = -57;
+        let currentPsi = -47;
+        let currentAA = 'general';
+        let plotMode = 'pro';
+        let showPlanes = true;
+
+        let update3DFn = null;
+        let rebuildSideChainFn = null;
+        let resetCamFn = null;
+        let setPlanesVisibleFn = null;
+
+        // ==========================================
+        // 2. 高 DPI (Retina / 4K) 高清畫布解析度設定
+        // ==========================================
+        const LOGICAL_SIZE = 460; // 邏輯座標尺寸
+        const DPR = Math.min(window.devicePixelRatio || 1, 3); // 最高支援 3x 超採樣高清渲染
+
+        function setupHighDPICanvas() {
+            ramaCanvas.width = LOGICAL_SIZE * DPR;
+            ramaCanvas.height = LOGICAL_SIZE * DPR;
+            rCtx.setTransform(DPR, 0, 0, DPR, 0, 0);
+        }
+        setupHighDPICanvas();
+
+        // ==========================================
+        // 3. 真實能量等高線場模型 (Gaussian Mixture KDE)
+        // ==========================================
+        function wrapDiff(a, b) {
+            let d = a - b;
+            while (d > 180) d -= 360;
+            while (d < -180) d += 360;
+            return d;
+        }
+
+        function evalGaussian2D(phi, psi, muPhi, muPsi, sigPhi, sigPsi, rho, weight) {
+            const dx = wrapDiff(phi, muPhi) / sigPhi;
+            const dy = wrapDiff(psi, muPsi) / sigPsi;
+            const z = (dx * dx - 2 * rho * dx * dy + dy * dy) / (2 * (1 - rho * rho));
+            return weight * Math.exp(-z);
+        }
+
+        const KDE_MODELS = {
+            general: [
+                { muPhi: -62, muPsi: -43, sigPhi: 14, sigPsi: 14, rho: -0.35, w: 1.00 },
+                { muPhi: -75, muPsi: -12, sigPhi: 22, sigPsi: 18, rho: -0.25, w: 0.42 },
+                { muPhi: -138, muPsi: 138, sigPhi: 20, sigPsi: 22, rho: -0.30, w: 0.85 },
+                { muPhi: -116, muPsi: 118, sigPhi: 18, sigPsi: 18, rho: -0.20, w: 0.72 },
+                { muPhi: -72, muPsi: 145, sigPhi: 15, sigPsi: 20, rho: -0.15, w: 0.78 },
+                { muPhi: -125, muPsi: 78, sigPhi: 24, sigPsi: 22, rho: 0.10, w: 0.28 },
+                { muPhi: 57, muPsi: 44, sigPhi: 13, sigPsi: 15, rho: -0.20, w: 0.58 },
+                { muPhi: 75, muPsi: -60, sigPhi: 14, sigPsi: 16, rho: 0.0, w: 0.22 }
+            ],
+            glycine: [
+                { muPhi: -65, muPsi: -40, sigPhi: 22, sigPsi: 22, rho: -0.2, w: 0.85 },
+                { muPhi: 68, muPsi: 35, sigPhi: 24, sigPsi: 24, rho: -0.2, w: 0.90 },
+                { muPhi: -155, muPsi: 160, sigPhi: 30, sigPsi: 28, rho: -0.1, w: 0.80 },
+                { muPhi: -85, muPsi: 155, sigPhi: 24, sigPsi: 24, rho: -0.1, w: 0.65 },
+                { muPhi: 155, muPsi: -160, sigPhi: 30, sigPsi: 28, rho: -0.1, w: 0.75 },
+                { muPhi: 90, muPsi: -155, sigPhi: 24, sigPsi: 24, rho: -0.1, w: 0.60 },
+                { muPhi: -80, muPsi: 5, sigPhi: 26, sigPsi: 18, rho: 0.0, w: 0.35 },
+                { muPhi: 80, muPsi: -5, sigPhi: 26, sigPsi: 18, rho: 0.0, w: 0.35 }
+            ],
+            proline: [
+                { muPhi: -62, muPsi: 145, sigPhi: 11, sigPsi: 22, rho: -0.1, w: 0.95 },
+                { muPhi: -60, muPsi: -35, sigPhi: 11, sigPsi: 18, rho: -0.1, w: 0.90 },
+                { muPhi: -62, muPsi: 50, sigPhi: 10, sigPsi: 35, rho: 0.0, w: 0.18 }
+            ]
+        };
+
+        function computeDensity(phi, psi, aaType) {
+            const peaks = KDE_MODELS[aaType] || KDE_MODELS.general;
+            let sum = 0;
+            for (let i = 0; i < peaks.length; i++) {
+                const p = peaks[i];
+                sum += evalGaussian2D(phi, psi, p.muPhi, p.muPsi, p.sigPhi, p.sigPsi, p.rho, p.w);
+            }
+            return sum;
+        }
+
+        // 高清離屏快取 (以實體 DPR 像素計算，確保等高線邊緣銳利無鋸齒)
+        const contourCache = {};
+
+        function generateContourCache(aaType, logicalW, logicalH) {
+            const physW = Math.round(logicalW * DPR);
+            const physH = Math.round(logicalH * DPR);
+
+            const offCanvas = document.createElement('canvas');
+            offCanvas.width = physW;
+            offCanvas.height = physH;
+            const ctx = offCanvas.getContext('2d');
+
+            const imgData = ctx.createImageData(physW, physH);
+            const data = imgData.data;
+
+            const tFavored = aaType === 'proline' ? 0.36 : 0.34;
+            const tAllowed = 0.11;
+
+            const grid = new Float32Array(physW * physH);
+            for (let py = 0; py < physH; py++) {
+                const psi = 180 - (py / physH) * 360;
+                for (let px = 0; px < physW; px++) {
+                    const phi = (px / physW) * 360 - 180;
+                    grid[py * physW + px] = computeDensity(phi, psi, aaType);
+                }
+            }
+
+            // 支援高 DPR 的線條粗細偵測
+            const strokeStep = Math.max(1, Math.round(DPR));
+
+            for (let py = 0; py < physH; py++) {
+                for (let px = 0; px < physW; px++) {
+                    const idx = py * physW + px;
+                    const val = grid[idx];
+
+                    const rightVal = px < physW - strokeStep ? grid[idx + strokeStep] : val;
+                    const downVal = py < physH - strokeStep ? grid[idx + physW * strokeStep] : val;
+
+                    const crossFavored = (val >= tFavored) !== (rightVal >= tFavored) || (val >= tFavored) !== (downVal >= tFavored);
+                    const crossAllowed = (val >= tAllowed) !== (rightVal >= tAllowed) || (val >= tAllowed) !== (downVal >= tAllowed);
+
+                    const pIdx = idx * 4;
+                    if (crossFavored) {
+                        data[pIdx] = 29; data[pIdx + 1] = 78; data[pIdx + 2] = 216; data[pIdx + 3] = 255;
+                    } else if (crossAllowed) {
+                        data[pIdx] = 59; data[pIdx + 1] = 130; data[pIdx + 2] = 246; data[pIdx + 3] = 210;
+                    } else if (val >= tFavored) {
+                        data[pIdx] = 147; data[pIdx + 1] = 197; data[pIdx + 2] = 253; data[pIdx + 3] = 235;
+                    } else if (val >= tAllowed) {
+                        data[pIdx] = 224; data[pIdx + 1] = 242; data[pIdx + 2] = 254; data[pIdx + 3] = 220;
+                    } else {
+                        data[pIdx] = 255; data[pIdx + 1] = 255; data[pIdx + 2] = 255; data[pIdx + 3] = 255;
+                    }
+                }
+            }
+
+            ctx.putImageData(imgData, 0, 0);
+
+            // 在實體像素上以 DPR 倍率繪製高清地標文字
+            ctx.save();
+            ctx.scale(DPR, DPR);
+            ctx.font = 'bold 11px -apple-system, BlinkMacSystemFont, "Noto Sans TC", sans-serif';
+            ctx.textAlign = 'center';
+            const toPX = (deg) => ((deg + 180) / 360) * logicalW;
+            const toPY = (deg) => ((180 - deg) / 360) * logicalH;
+
+            if (aaType === 'general') {
+                ctx.fillStyle = '#1e3a8a';
+                ctx.fillText('反平行 β', toPX(-142), toPY(152));
+                ctx.fillText('平行 β', toPX(-118), toPY(112));
+                ctx.fillText('PPII', toPX(-68), toPY(150));
+                ctx.fillText('右手 α', toPX(-62), toPY(-45));
+                ctx.fillText('3₁₀', toPX(-82), toPY(-8));
+                ctx.fillText('左手 α', toPX(57), toPY(45));
+                ctx.fillStyle = '#3b82f6';
+                ctx.font = '10px sans-serif';
+                ctx.fillText('γ-turn', toPX(75), toPY(-62));
+            } else if (aaType === 'glycine') {
+                ctx.fillStyle = '#1e3a8a';
+                ctx.fillText('右手 α 區', toPX(-65), toPY(-40));
+                ctx.fillText('左手 α 區', toPX(68), toPY(35));
+                ctx.fillText('β / PPII', toPX(-125), toPY(158));
+                ctx.fillText('對稱延伸區', toPX(125), toPY(-158));
+            } else if (aaType === 'proline') {
+                ctx.fillStyle = '#1e3a8a';
+                ctx.fillText('PPII / β 島', toPX(-62), toPY(145));
+                ctx.fillText('α-螺旋島', toPX(-60), toPY(-35));
+                ctx.fillStyle = '#64748b';
+                ctx.font = '10px sans-serif';
+                ctx.fillText('φ 被五元環鎖定在 -60° 附近', toPX(48), toPY(0));
+            }
+            ctx.restore();
+
+            return offCanvas;
+        }
+
+        // ==========================================
+        // 4. 生化區域與白話文狀態判定
+        // ==========================================
+        function evaluateRegion(phi, psi, aaType) {
+            const density = computeDensity(phi, psi, aaType);
+            const tFavored = aaType === 'proline' ? 0.36 : 0.34;
+            const tAllowed = 0.11;
+
+            let structName = '';
+            let plainExplain = '';
+
+            if (aaType === 'general') {
+                if (phi >= -165 && phi <= -125 && psi >= 125 && psi <= 175) {
+                    structName = '反平行 β-摺疊 (Antiparallel β-sheet)';
+                    plainExplain = '骨架拉得很直，適合兩條反向平行的蛋白質鏈排排站並牽手（形成氫鍵）。';
+                } else if (phi >= -130 && phi <= -95 && psi >= 95 && psi <= 135) {
+                    structName = '平行 β-摺疊 (Parallel β-sheet)';
+                    plainExplain = '骨架呈鋸齒狀伸展，適合兩條同方向的蛋白質鏈並排形成片狀結構。';
+                } else if (phi >= -90 && phi <= -55 && psi >= 120 && psi <= 170) {
+                    structName = '膠原蛋白 / PPII 螺旋';
+                    plainExplain = '形成較為伸展的左手螺旋，是構成皮膚與肌腱「膠原蛋白」的標準角度。';
+                } else if (phi >= -80 && phi <= -45 && psi >= -60 && psi <= -32) {
+                    structName = '右手 α-螺旋 (Right-handed α-helix)';
+                    plainExplain = '自然界最穩定的螺旋彈簧結構，原子間距完美，完全不會互相擠壓。';
+                } else if (phi >= -95 && phi <= -45 && psi >= -31 && psi <= -5) {
+                    structName = '3₁₀-螺旋 / 橋接區';
+                    plainExplain = '比 α-螺旋更緊湊一點的螺旋構形，常見於螺旋的頭尾兩端。';
+                } else if (phi >= 40 && phi <= 75 && psi >= 25 && psi <= 65) {
+                    structName = '左手 α-螺旋 (Left-handed α-helix)';
+                    plainExplain = '罕見的反向螺旋，因為側鏈 R 基會稍微靠近主鏈，通常只有特定轉角才會出現。';
+                }
+            }
+
+            if (density >= tFavored) {
+                return {
+                    status: 'safe',
+                    title: `✅ 最有利核心區 (Favored)${structName ? ' — ' + structName : ''}`,
+                    desc: plainExplain || '原子之間保持最舒適的黃金距離，自然界超過 98% 的胺基酸都落在這個深藍區內。'
+                };
+            }
+            if (density >= tAllowed) {
+                return {
+                    status: 'allowed',
+                    title: `⚠️ 額外容許區 (Allowed)${structName ? ' — ' + structName : ''}`,
+                    desc: plainExplain || '原子稍微靠近了一點（有點擠），但在物理上仍轉得過去，蛋白質折疊緊繃時會用到。'
+                };
+            }
+
+            if (aaType === 'proline') {
+                return {
+                    status: 'clash',
+                    title: '⛔ 嚴重禁區 (Outlier) — 脯胺酸環狀鎖死',
+                    desc: '脯胺酸的金色側鏈直接黏死了左側氮原子，物理上根本無法轉到這個 φ 角度！'
+                };
+            }
+            return {
+                status: 'clash',
+                title: '⛔ 立體阻礙禁區 (Outlier) — 原子發生碰撞！',
+                desc: '請看左側 3D 模型中的紅色發光球：兩邊的原子距離太近、實體球體重疊撞在一起了。'
+            };
+        }
+
+        // ==========================================
+        // 5. 繪製高清拉氏圖
+        // ==========================================
+        function drawRamachandranPlot(phi, psi, aaType) {
+            const w = LOGICAL_SIZE;
+            const h = LOGICAL_SIZE;
+            const pad = 42;
+            const plotW = w - pad * 2;
+            const plotH = h - pad * 2;
+
+            rCtx.clearRect(0, 0, w, h);
+
+            const toX = (deg) => pad + ((deg + 180) / 360) * plotW;
+            const toY = (deg) => pad + ((180 - deg) / 360) * plotH;
+
+            if (plotMode === 'pro') {
+                if (!contourCache[aaType]) {
+                    contourCache[aaType] = generateContourCache(aaType, plotW, plotH);
+                }
+                // 將高清離屏畫布精準貼入邏輯座標區
+                rCtx.drawImage(contourCache[aaType], pad, pad, plotW, plotH);
+            } else {
+                if (aaType === 'glycine') {
+                    rCtx.fillStyle = '#dcfce7';
+                    rCtx.fillRect(pad, pad, plotW, plotH);
+                    rCtx.fillStyle = '#ffffff';
+                    rCtx.fillRect(toX(-25), toY(25), (50 / 360) * plotW, (50 / 360) * plotH);
+                } else if (aaType === 'proline') {
+                    rCtx.fillStyle = '#ecfccb';
+                    rCtx.fillRect(toX(-85), pad, (50 / 360) * plotW, plotH);
+                    rCtx.fillStyle = '#86efac';
+                    rCtx.fillRect(toX(-85), toY(0), (50 / 360) * plotW, (60 / 360) * plotH);
+                    rCtx.fillRect(toX(-85), toY(170), (50 / 360) * plotW, (60 / 360) * plotH);
+                } else {
+                    rCtx.fillStyle = '#ecfccb';
+                    rCtx.fillRect(toX(-175), toY(180), (120 / 360) * plotW, (120 / 360) * plotH);
+                    rCtx.fillRect(toX(-130), toY(20), (100 / 360) * plotW, (100 / 360) * plotH);
+
+                    rCtx.fillStyle = '#bbf7d0';
+                    rCtx.fillRect(toX(-165), toY(175), (90 / 360) * plotW, (80 / 360) * plotH);
+
+                    rCtx.fillStyle = '#bfdbfe';
+                    rCtx.fillRect(toX(-95), toY(-15), (60 / 360) * plotW, (50 / 360) * plotH);
+
+                    rCtx.fillStyle = '#ddd6fe';
+                    rCtx.fillRect(toX(35), toY(65), (40 / 360) * plotW, (45 / 360) * plotH);
+                }
+            }
+
+            // 60° 細網格線
+            rCtx.strokeStyle = 'rgba(148, 163, 184, 0.3)';
+            rCtx.lineWidth = 1;
+            [-120, -60, 60, 120].forEach(deg => {
+                rCtx.beginPath();
+                rCtx.moveTo(toX(deg), pad);
+                rCtx.lineTo(toX(deg), pad + plotH);
+                rCtx.moveTo(pad, toY(deg));
+                rCtx.lineTo(pad + plotW, toY(deg));
+                rCtx.stroke();
+            });
+
+            // 外框與 0° 十字主軸
+            rCtx.strokeStyle = '#475569';
+            rCtx.lineWidth = 1.25;
+            rCtx.strokeRect(pad, pad, plotW, plotH);
+
+            rCtx.beginPath();
+            rCtx.moveTo(toX(0), pad);
+            rCtx.lineTo(toX(0), pad + plotH);
+            rCtx.moveTo(pad, toY(0));
+            rCtx.lineTo(pad + plotW, toY(0));
+            rCtx.stroke();
+
+            // 刻度文字
+            rCtx.fillStyle = '#334155';
+            rCtx.font = '11px -apple-system, BlinkMacSystemFont, sans-serif';
+            rCtx.textAlign = 'center';
+            [-180, -120, -60, 0, 60, 120, 180].forEach(deg => {
+                rCtx.fillText(deg + '°', toX(deg), h - 18);
+                rCtx.fillText(deg + '°', 20, toY(deg) + 4);
+            });
+
+            rCtx.font = 'bold 12.5px -apple-system, BlinkMacSystemFont, "Noto Sans TC", sans-serif';
+            rCtx.fillStyle = '#0f172a';
+            rCtx.fillText('φ (Phi) 角度', w / 2, h - 4);
+
+            rCtx.save();
+            rCtx.translate(12, h / 2);
+            rCtx.rotate(-Math.PI / 2);
+            rCtx.fillText('ψ (Psi) 角度', 0, 0);
+            rCtx.restore();
+
+            // 當前座標紅點與準星
+            const curX = toX(phi);
+            const curY = toY(psi);
+
+            rCtx.strokeStyle = 'rgba(220, 38, 38, 0.55)';
+            rCtx.setLineDash([4, 4]);
+            rCtx.beginPath();
+            rCtx.moveTo(curX, pad);
+            rCtx.lineTo(curX, pad + plotH);
+            rCtx.moveTo(pad, curY);
+            rCtx.lineTo(pad + plotW, curY);
+            rCtx.stroke();
+            rCtx.setLineDash([]);
+
+            rCtx.beginPath();
+            rCtx.arc(curX, curY, 7, 0, Math.PI * 2);
+            rCtx.fillStyle = '#dc2626';
+            rCtx.fill();
+            rCtx.strokeStyle = '#ffffff';
+            rCtx.lineWidth = 2;
+            rCtx.stroke();
+
+            // 即時座標白底標籤
+            const coordText = `(${phi}°, ${psi}°)`;
+            rCtx.font = 'bold 11.5px ui-monospace, SFMono-Regular, monospace';
+            const textW = rCtx.measureText(coordText).width;
+            const labelX = phi > 90 ? curX - textW - 14 : curX + 10;
+            const labelY = psi > 150 ? curY + 18 : curY - 10;
+
+            rCtx.fillStyle = 'rgba(255, 255, 255, 0.92)';
+            rCtx.strokeStyle = 'rgba(220, 38, 38, 0.3)';
+            rCtx.lineWidth = 1;
+            rCtx.fillRect(labelX - 4, labelY - 12, textW + 8, 16);
+            rCtx.strokeRect(labelX - 4, labelY - 12, textW + 8, 16);
+
+            rCtx.fillStyle = '#b91c1c';
+            rCtx.textAlign = 'left';
+            rCtx.fillText(coordText, labelX, labelY);
+        }
+
+        // ==========================================
+        // 6. 互動事件與任務卡控制
+        // ==========================================
+        let isDraggingPlot = false;
+
+        function handlePlotPointer(e) {
+            const rect = ramaCanvas.getBoundingClientRect();
+            const x = ((e.clientX - rect.left) / rect.width) * LOGICAL_SIZE;
+            const y = ((e.clientY - rect.top) / rect.height) * LOGICAL_SIZE;
+
+            const pad = 42;
+            const plotW = LOGICAL_SIZE - pad * 2;
+            const plotH = LOGICAL_SIZE - pad * 2;
+
+            let degPhi = Math.round(((x - pad) / plotW) * 360 - 180);
+            let degPsi = Math.round(180 - ((y - pad) / plotH) * 360);
+
+            degPhi = Math.max(-180, Math.min(180, degPhi));
+            degPsi = Math.max(-180, Math.min(180, degPsi));
+
+            setAngles(degPhi, degPsi);
+        }
+
+        ramaCanvas.addEventListener('mousedown', (e) => {
+            isDraggingPlot = true;
+            handlePlotPointer(e);
+        });
+        window.addEventListener('mousemove', (e) => {
+            if (isDraggingPlot) handlePlotPointer(e);
+        });
+        window.addEventListener('mouseup', () => {
+            isDraggingPlot = false;
+        });
+
+        function setAngles(phi, psi) {
+            currentPhi = phi;
+            currentPsi = psi;
+            phiSlider.value = phi;
+            psiSlider.value = psi;
+            updateAll();
+        }
+
+        function setAminoAcid(aa) {
+            currentAA = aa;
+            aaSelect.value = aa;
+            if (rebuildSideChainFn) rebuildSideChainFn(aa);
+            updateAll();
+        }
+
+        function updateAll() {
+            phiVal.textContent = `${currentPhi}°`;
+            psiVal.textContent = `${currentPsi}°`;
+
+            const evalResult = evaluateRegion(currentPhi, currentPsi, currentAA);
+            statusPanel.className = `status-panel ${evalResult.status}`;
+            statusTitle.textContent = evalResult.title;
+            statusDesc.textContent = evalResult.desc;
+
+            drawRamachandranPlot(currentPhi, currentPsi, currentAA);
+            if (update3DFn) {
+                update3DFn(currentPhi, currentPsi, evalResult);
+            }
+        }
+
+        // 新手四步互動任務卡點擊邏輯
+        function highlightQuest(id) {
+            document.querySelectorAll('.quest-card').forEach(el => el.classList.remove('active-quest'));
+            document.getElementById(id).classList.add('active-quest');
+        }
+
+        document.getElementById('quest1').addEventListener('click', () => {
+            highlightQuest('quest1');
+            setAminoAcid('general');
+            setAngles(-120, 120);
+            threeCaption.innerHTML = '💡 <strong>第 1 步觀察：</strong>藍色與綠色兩片半透明板塊就是剛性的「胜肽平面」，它們像硬紙板一樣不會折彎，只能繞著中間黑球 <strong>Cα</strong> 轉動。';
+        });
+
+        document.getElementById('quest2').addEventListener('click', () => {
+            highlightQuest('quest2');
+            setAminoAcid('general');
+            setAngles(0, 0);
+            threeCaption.innerHTML = '⚠️ <strong>第 2 步觀察：</strong>在 (0°, 0°) 時，左側白色的氫原子 (H) 與右側紅色的氧原子 (O) 直接撞在一起！這就是為什麼拉氏圖中間大部分是白色禁區。';
+        });
+
+        document.getElementById('quest3').addEventListener('click', () => {
+            highlightQuest('quest3');
+            setAminoAcid('general');
+            setAngles(-57, -47);
+            threeCaption.innerHTML = '✅ <strong>第 3 步觀察：</strong>調到 (-57°, -47°) 後，原子完全閃開了！在真實蛋白質中，連續幾個胺基酸都採用這個角度，就會捲成「右手 α-螺旋」。';
+        });
+
+        document.getElementById('quest4').addEventListener('click', () => {
+            highlightQuest('quest4');
+            setAminoAcid('proline');
+            setAngles(-60, 145);
+            threeCaption.innerHTML = '🔒 <strong>第 4 步觀察：</strong>看到中間多出來的金色五元環了嗎？它把左側氮原子 (藍球) 與中心 Cα 死死扣住，所以 φ 角只能卡在 -60° 左右！';
+        });
+
+        // 模式切換
+        modeProBtn.addEventListener('click', () => {
+            plotMode = 'pro';
+            modeProBtn.classList.add('active');
+            modeSimpleBtn.classList.remove('active');
+            plotLegend.innerHTML = `
+                <span class="badge favored">深藍實線內：最有利核心區 (Favored)</span>
+                <span class="badge allowed-pro">淺藍外圈內：額外容許區 (Allowed)</span>
+            `;
+            drawRamachandranPlot(currentPhi, currentPsi, currentAA);
+        });
+
+        modeSimpleBtn.addEventListener('click', () => {
+            plotMode = 'simple';
+            modeSimpleBtn.classList.add('active');
+            modeProBtn.classList.remove('active');
+            plotLegend.innerHTML = `
+                <span class="badge beta">左上：β-摺疊</span>
+                <span class="badge alpha-r">左下：右手 α-螺旋</span>
+                <span class="badge alpha-l">右上：左手 α-螺旋</span>
+            `;
+            drawRamachandranPlot(currentPhi, currentPsi, currentAA);
+        });
+
+        phiSlider.addEventListener('input', (e) => {
+            currentPhi = parseInt(e.target.value, 10);
+            updateAll();
+        });
+
+        psiSlider.addEventListener('input', (e) => {
+            currentPsi = parseInt(e.target.value, 10);
+            updateAll();
+        });
+
+        aaSelect.addEventListener('change', (e) => {
+            setAminoAcid(e.target.value);
+        });
+
+        document.getElementById('btnAlphaR').addEventListener('click', () => setAngles(-57, -47));
+        document.getElementById('btnBetaAnti').addEventListener('click', () => setAngles(-139, 135));
+        document.getElementById('btnBetaPara').addEventListener('click', () => setAngles(-119, 113));
+        document.getElementById('btnPPII').addEventListener('click', () => setAngles(-75, 145));
+        document.getElementById('btnAlpha310').addEventListener('click', () => setAngles(-49, -26));
+        document.getElementById('btnAlphaL').addEventListener('click', () => setAngles(57, 47));
+        document.getElementById('btnClash').addEventListener('click', () => setAngles(0, 0));
+
+        document.getElementById('resetCamBtn').addEventListener('click', () => {
+            if (resetCamFn) resetCamFn();
+        });
+
+        document.getElementById('togglePlanesBtn').addEventListener('click', (e) => {
+            showPlanes = !showPlanes;
+            e.target.textContent = showPlanes ? '隱藏硬紙板' : '顯示硬紙板';
+            if (setPlanesVisibleFn) setPlanesVisibleFn(showPlanes);
+        });
+
+        updateAll();
+
+        // ==========================================
+        // 7. Three.js 3D 渲染引擎（含旋轉軸標示與高清標籤）
+        // ==========================================
+        async function init3DEngine() {
+            try {
+                const THREE = await import('three');
+                const { OrbitControls } = await import('three/addons/controls/OrbitControls.js');
+
+                const scene = new THREE.Scene();
+                const width = threeContainer.clientWidth || 500;
+                const height = threeContainer.clientHeight || 430;
+                const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 100);
+                camera.position.set(0, 3.0, 8.8);
+
+                const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+                renderer.setSize(width, height);
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                renderer.toneMapping = THREE.ACESFilmicToneMapping;
+                renderer.toneMappingExposure = 1.18;
+                threeContainer.appendChild(renderer.domElement);
+
+                const controls = new OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+                controls.dampingFactor = 0.06;
+                controls.minDistance = 4;
+                controls.maxDistance = 16;
+
+                scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+                const dirLight1 = new THREE.DirectionalLight(0xffffff, 1.45);
+                dirLight1.position.set(5, 8, 6);
+                scene.add(dirLight1);
+
+                const dirLight2 = new THREE.DirectionalLight(0x93c5fd, 0.75);
+                dirLight2.position.set(-6, -4, -5);
+                scene.add(dirLight2);
+
+                const matCAlpha = new THREE.MeshPhysicalMaterial({ color: 0x334155, roughness: 0.25, metalness: 0.1, clearcoat: 0.4 });
+                const matCarbon = new THREE.MeshPhysicalMaterial({ color: 0x64748b, roughness: 0.3, clearcoat: 0.3 });
+                const matNitrogen = new THREE.MeshPhysicalMaterial({ color: 0x2563eb, roughness: 0.25, clearcoat: 0.4 });
+                const matOxygen = new THREE.MeshPhysicalMaterial({ color: 0xef4444, roughness: 0.2, clearcoat: 0.5 });
+                const matHydrogen = new THREE.MeshPhysicalMaterial({ color: 0xf8fafc, roughness: 0.3, clearcoat: 0.3 });
+                const matRGroup = new THREE.MeshPhysicalMaterial({ color: 0xf59e0b, roughness: 0.25, clearcoat: 0.4 });
+                const matBond = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.4 });
+                const matClashGlow = new THREE.MeshBasicMaterial({ color: 0xff2a2a, transparent: true, opacity: 0.38 });
+
+                function createSphere(radius, material, pos) {
+                    const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, 32, 32), material);
+                    mesh.position.copy(pos);
+                    return mesh;
+                }
+
+                function createBond(p1, p2, radius = 0.11, material = matBond) {
+                    const dir = new THREE.Vector3().subVectors(p2, p1);
+                    const len = dir.length();
+                    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, len, 16), material);
+                    mesh.position.copy(p1).add(p2).multiplyScalar(0.5);
+                    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+                    return mesh;
+                }
+
+                // 建立高清 3D 浮動文字標籤 (Sprite)
+                function createTextSprite(text, bgColor = 'rgba(15, 23, 42, 0.78)', textColor = '#ffffff') {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 256;
+                    canvas.height = 64;
+                    const ctx = canvas.getContext('2d');
+
+                    ctx.fillStyle = bgColor;
+                    ctx.beginPath();
+                    ctx.roundRect(16, 10, 224, 44, 12);
+                    ctx.fill();
+
+                    ctx.font = 'bold 24px -apple-system, BlinkMacSystemFont, sans-serif';
+                    ctx.fillStyle = textColor;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(text, 128, 33);
+
+                    const tex = new THREE.CanvasTexture(canvas);
+                    const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
+                    const sprite = new THREE.Sprite(mat);
+                    sprite.scale.set(1.5, 0.38, 1);
+                    return sprite;
+                }
+
+                const rootGroup = new THREE.Group();
+                scene.add(rootGroup);
+
+                // 中心 Cα 關節
+                rootGroup.add(createSphere(0.42, matCAlpha, new THREE.Vector3(0, 0, 0)));
+                const caLabel = createTextSprite('Cα (中心關節)');
+                caLabel.position.set(0, -0.68, 0);
+                rootGroup.add(caLabel);
+
+                const hAlphaPos = new THREE.Vector3(0, -0.75, 0.55);
+                rootGroup.add(createSphere(0.24, matHydrogen, hAlphaPos));
+                rootGroup.add(createBond(new THREE.Vector3(0, 0, 0), hAlphaPos, 0.08));
+
+                const sideChainGroup = new THREE.Group();
+                rootGroup.add(sideChainGroup);
+
+                // 左側分支 (φ 旋轉軸)
+                const nPos = new THREE.Vector3(-1.25, 0.65, 0);
+                rootGroup.add(createBond(new THREE.Vector3(0, 0, 0), nPos, 0.12));
+
+                // 繪製 φ 旋轉軸延長虛線
+                const axisPhiDir = nPos.clone().normalize();
+                const phiAxisLine = new THREE.Line(
+                    new THREE.BufferGeometry().setFromPoints([
+                        axisPhiDir.clone().multiplyScalar(-1.2),
+                        axisPhiDir.clone().multiplyScalar(3.2)
+                    ]),
+                    new THREE.LineDashedMaterial({ color: 0x60a5fa, dashSize: 0.18, gapSize: 0.1 })
+                );
+                phiAxisLine.computeLineDistances();
+                rootGroup.add(phiAxisLine);
+
+                const phiAxisLabel = createTextSprite('φ 轉軸', 'rgba(37, 99, 235, 0.85)');
+                phiAxisLabel.position.copy(axisPhiDir.clone().multiplyScalar(2.7));
+                rootGroup.add(phiAxisLabel);
+
+                const phiPivot = new THREE.Group();
+                phiPivot.position.copy(nPos);
+                rootGroup.add(phiPivot);
+                phiPivot.add(createSphere(0.38, matNitrogen, new THREE.Vector3(0, 0, 0)));
+
+                const leftPlaneGroup = new THREE.Group();
+                phiPivot.add(leftPlaneGroup);
+
+                const hAmideLocal = new THREE.Vector3(-0.35, -0.85, 0);
+                const cPrevLocal = new THREE.Vector3(-1.15, 0.65, 0);
+                const oPrevLocal = new THREE.Vector3(-1.15, 1.85, 0);
+                const caPrevLocal = new THREE.Vector3(-2.35, -0.15, 0);
+
+                const hAmideMesh = createSphere(0.25, matHydrogen, hAmideLocal);
+                const cPrevMesh = createSphere(0.36, matCarbon, cPrevLocal);
+                const oPrevMesh = createSphere(0.36, matOxygen, oPrevLocal);
+                const caPrevMesh = createSphere(0.36, matCAlpha, caPrevLocal);
+
+                leftPlaneGroup.add(hAmideMesh, cPrevMesh, oPrevMesh, caPrevMesh);
+                leftPlaneGroup.add(createBond(new THREE.Vector3(0, 0, 0), hAmideLocal, 0.08));
+                leftPlaneGroup.add(createBond(new THREE.Vector3(0, 0, 0), cPrevLocal, 0.12));
+                leftPlaneGroup.add(createBond(cPrevLocal, oPrevLocal, 0.11));
+                leftPlaneGroup.add(createBond(cPrevLocal, caPrevLocal, 0.12));
+
+                const leftBoard = new THREE.Mesh(
+                    new THREE.BoxGeometry(2.6, 2.3, 0.05),
+                    new THREE.MeshPhysicalMaterial({ color: 0x3b82f6, transparent: true, opacity: 0.25, roughness: 0.1, side: THREE.DoubleSide })
+                );
+                leftBoard.position.set(-1.15, 0.65, 0);
+                leftPlaneGroup.add(leftBoard);
+
+                // 右側分支 (ψ 旋轉軸)
+                const cPrimePos = new THREE.Vector3(1.25, 0.65, 0);
+                rootGroup.add(createBond(new THREE.Vector3(0, 0, 0), cPrimePos, 0.12));
+
+                // 繪製 ψ 旋轉軸延長虛線
+                const axisPsiDir = cPrimePos.clone().normalize();
+                const psiAxisLine = new THREE.Line(
+                    new THREE.BufferGeometry().setFromPoints([
+                        axisPsiDir.clone().multiplyScalar(-1.2),
+                        axisPsiDir.clone().multiplyScalar(3.2)
+                    ]),
+                    new THREE.LineDashedMaterial({ color: 0x34d399, dashSize: 0.18, gapSize: 0.1 })
+                );
+                psiAxisLine.computeLineDistances();
+                rootGroup.add(psiAxisLine);
+
+                const psiAxisLabel = createTextSprite('ψ 轉軸', 'rgba(5, 150, 105, 0.85)');
+                psiAxisLabel.position.copy(axisPsiDir.clone().multiplyScalar(2.7));
+                rootGroup.add(psiAxisLabel);
+
+                const psiPivot = new THREE.Group();
+                psiPivot.position.copy(cPrimePos);
+                rootGroup.add(psiPivot);
+                psiPivot.add(createSphere(0.38, matCarbon, new THREE.Vector3(0, 0, 0)));
+
+                const rightPlaneGroup = new THREE.Group();
+                psiPivot.add(rightPlaneGroup);
+
+                const oCarbLocal = new THREE.Vector3(0.35, -0.95, 0);
+                const nNextLocal = new THREE.Vector3(1.15, 0.65, 0);
+                const hNextLocal = new THREE.Vector3(1.15, 1.65, 0);
+                const caNextLocal = new THREE.Vector3(2.35, -0.15, 0);
+
+                const oCarbMesh = createSphere(0.36, matOxygen, oCarbLocal);
+                const nNextMesh = createSphere(0.36, matNitrogen, nNextLocal);
+                const hNextMesh = createSphere(0.25, matHydrogen, hNextLocal);
+                const caNextMesh = createSphere(0.36, matCAlpha, caNextLocal);
+
+                rightPlaneGroup.add(oCarbMesh, nNextMesh, hNextMesh, caNextMesh);
+                rightPlaneGroup.add(createBond(new THREE.Vector3(0, 0, 0), oCarbLocal, 0.11));
+                rightPlaneGroup.add(createBond(new THREE.Vector3(0, 0, 0), nNextLocal, 0.12));
+                rightPlaneGroup.add(createBond(nNextLocal, hNextLocal, 0.08));
+                rightPlaneGroup.add(createBond(nNextLocal, caNextLocal, 0.12));
+
+                const rightBoard = new THREE.Mesh(
+                    new THREE.BoxGeometry(2.6, 2.3, 0.05),
+                    new THREE.MeshPhysicalMaterial({ color: 0x10b981, transparent: true, opacity: 0.25, roughness: 0.1, side: THREE.DoubleSide })
+                );
+                rightBoard.position.set(1.15, 0.65, 0);
+                rightPlaneGroup.add(rightBoard);
+
+                setPlanesVisibleFn = (visible) => {
+                    leftBoard.visible = visible;
+                    rightBoard.visible = visible;
+                };
+
+                // 碰撞光球
+                const clashSphere1 = createSphere(0.65, matClashGlow, new THREE.Vector3());
+                const clashSphere2 = createSphere(0.65, matClashGlow, new THREE.Vector3());
+                clashSphere1.visible = false;
+                clashSphere2.visible = false;
+                scene.add(clashSphere1, clashSphere2);
+
+                const clashLine = new THREE.Line(
+                    new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]),
+                    new THREE.LineBasicMaterial({ color: 0xff0000 })
+                );
+                clashLine.visible = false;
+                scene.add(clashLine);
+
+                let rBetaMesh = null;
+                rebuildSideChainFn = (aaType) => {
+                    while (sideChainGroup.children.length > 0) {
+                        sideChainGroup.remove(sideChainGroup.children[0]);
+                    }
+                    rBetaMesh = null;
+
+                    if (aaType === 'glycine') {
+                        const hPos = new THREE.Vector3(0, 0.85, -0.65);
+                        rBetaMesh = createSphere(0.24, matHydrogen, hPos);
+                        const lbl = createTextSprite('H (極小側鏈)', 'rgba(100, 116, 139, 0.85)');
+                        lbl.position.set(0, 1.35, -0.65);
+                        sideChainGroup.add(rBetaMesh, lbl, createBond(new THREE.Vector3(0, 0, 0), hPos, 0.08));
+                    } else if (aaType === 'proline') {
+                        const cBetaPos = new THREE.Vector3(-0.35, 0.95, -0.65);
+                        const cGammaPos = new THREE.Vector3(-1.25, 1.35, -0.45);
+                        rBetaMesh = createSphere(0.36, matRGroup, cBetaPos);
+                        const cGammaMesh = createSphere(0.34, matRGroup, cGammaPos);
+                        const lbl = createTextSprite('五元鎖死環', 'rgba(217, 119, 6, 0.9)');
+                        lbl.position.set(-0.8, 1.85, -0.55);
+                        sideChainGroup.add(
+                            rBetaMesh, cGammaMesh, lbl,
+                            createBond(new THREE.Vector3(0, 0, 0), cBetaPos, 0.11),
+                            createBond(cBetaPos, cGammaPos, 0.11),
+                            createBond(cGammaPos, nPos, 0.11)
+                        );
+                    } else {
+                        const rPos = new THREE.Vector3(0, 1.05, -0.75);
+                        rBetaMesh = createSphere(0.46, matRGroup, rPos);
+                        const lbl = createTextSprite('R 側鏈基團', 'rgba(217, 119, 6, 0.85)');
+                        lbl.position.set(0, 1.65, -0.75);
+                        sideChainGroup.add(rBetaMesh, lbl, createBond(new THREE.Vector3(0, 0, 0), rPos, 0.12));
+                    }
+                };
+
+                update3DFn = (phiDeg, psiDeg, evalResult) => {
+                    phiPivot.quaternion.setFromAxisAngle(axisPhiDir, THREE.MathUtils.degToRad(phiDeg + 180));
+                    psiPivot.quaternion.setFromAxisAngle(axisPsiDir, THREE.MathUtils.degToRad(psiDeg + 180));
+                    rootGroup.updateMatrixWorld(true);
+
+                    const posHAmide = new THREE.Vector3().setFromMatrixPosition(hAmideMesh.matrixWorld);
+                    const posOPrev = new THREE.Vector3().setFromMatrixPosition(oPrevMesh.matrixWorld);
+                    const posOCarb = new THREE.Vector3().setFromMatrixPosition(oCarbMesh.matrixWorld);
+                    const posNNext = new THREE.Vector3().setFromMatrixPosition(nNextMesh.matrixWorld);
+                    const posRBeta = rBetaMesh ? new THREE.Vector3().setFromMatrixPosition(rBetaMesh.matrixWorld) : new THREE.Vector3(0, 5, 0);
+
+                    const pairs = [
+                        { p1: posHAmide, p2: posOCarb, dist: posHAmide.distanceTo(posOCarb) },
+                        { p1: posOPrev, p2: posOCarb, dist: posOPrev.distanceTo(posOCarb) },
+                        { p1: posOPrev, p2: posNNext, dist: posOPrev.distanceTo(posNNext) },
+                        { p1: posOCarb, p2: posRBeta, dist: posOCarb.distanceTo(posRBeta) },
+                        { p1: posOPrev, p2: posRBeta, dist: posOPrev.distanceTo(posRBeta) }
+                    ].sort((a, b) => a.dist - b.dist);
+
+                    if (evalResult.status === 'clash') {
+                        clashSphere1.position.copy(pairs[0].p1);
+                        clashSphere2.position.copy(pairs[0].p2);
+                        clashSphere1.visible = true;
+                        clashSphere2.visible = true;
+                        clashLine.geometry.setFromPoints([pairs[0].p1, pairs[0].p2]);
+                        clashLine.visible = true;
+                    } else {
+                        clashSphere1.visible = false;
+                        clashSphere2.visible = false;
+                        clashLine.visible = false;
+                    }
+                };
+
+                resetCamFn = () => {
+                    camera.position.set(0, 3.0, 8.8);
+                    controls.target.set(0, 0, 0);
+                    controls.update();
+                };
+
+                window.addEventListener('resize', () => {
+                    const newW = threeContainer.clientWidth;
+                    const newH = threeContainer.clientHeight;
+                    camera.aspect = newW / newH;
+                    camera.updateProjectionMatrix();
+                    renderer.setSize(newW, newH);
+                });
+
+                rebuildSideChainFn(currentAA);
+                updateAll();
+
+                const clock = new THREE.Clock();
+                function animate() {
+                    requestAnimationFrame(animate);
+                    controls.update();
+                    if (clashSphere1.visible) {
+                        const pulse = 1 + Math.sin(clock.getElapsedTime() * 8) * 0.15;
+                        clashSphere1.scale.setScalar(pulse);
+                        clashSphere2.scale.setScalar(pulse);
+                    }
+                    renderer.render(scene, camera);
+                }
+                animate();
+
+            } catch (err) {
+                threeContainer.innerHTML = `<div style="color:#fca5a5; padding:20px; font-size:0.9rem;">
+                    <strong>3D 渲染引擎載入失敗：</strong>${err.message}
+                </div>`;
+            }
+        }
+
+        init3DEngine();
+    </script>
+</body>
+</html>
