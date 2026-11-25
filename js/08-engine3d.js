@@ -16,9 +16,13 @@
                 const camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 320);
                 camera.position.set(0, 2.8, 9.6);
 
+                const isMobilePerf = (window.matchMedia && window.matchMedia('(pointer: coarse)').matches)
+                    || Math.min(window.innerWidth, window.innerHeight) <= 680;
+                const targetDPR = Math.min(window.devicePixelRatio || 1, isMobilePerf ? 1.35 : 2);
+
                 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
                 renderer.setSize(width, height);
-                renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                renderer.setPixelRatio(targetDPR);
                 renderer.toneMapping = THREE.ACESFilmicToneMapping;
                 renderer.toneMappingExposure = 1.15;
                 threeContainer.appendChild(renderer.domElement);
@@ -93,31 +97,39 @@
                 rimLight.position.set(0, -6, -10);
                 scene.add(rimLight);
 
-                // Ceramic / Anodized Metal Apple PBR Materials (Pre-allocated once for zero GC/shader stutter)
-                const matCAlpha = new THREE.MeshPhysicalMaterial({ color: 0x2c2c2e, roughness: 0.2, metalness: 0.25, clearcoat: 0.9, clearcoatRoughness: 0.12 });
-                const matCarbon = new THREE.MeshPhysicalMaterial({ color: 0x636366, roughness: 0.24, metalness: 0.2, clearcoat: 0.8, clearcoatRoughness: 0.15 });
-                const matNitrogen = new THREE.MeshPhysicalMaterial({ color: 0x0a84ff, roughness: 0.18, metalness: 0.12, clearcoat: 0.95, clearcoatRoughness: 0.1 });
-                const matOxygen = new THREE.MeshPhysicalMaterial({ color: 0xff3b30, roughness: 0.16, metalness: 0.1, clearcoat: 0.95, clearcoatRoughness: 0.08 });
-                const matHydrogen = new THREE.MeshPhysicalMaterial({ color: 0xf5f5f7, roughness: 0.22, metalness: 0.05, clearcoat: 0.85, clearcoatRoughness: 0.12 });
-                const matRGroup = new THREE.MeshPhysicalMaterial({ color: 0xff9f0a, roughness: 0.18, metalness: 0.15, clearcoat: 0.95, clearcoatRoughness: 0.1 });
-                const matSulfur = new THREE.MeshPhysicalMaterial({ color: 0xffd60a, roughness: 0.18, metalness: 0.15, clearcoat: 0.92, clearcoatRoughness: 0.1 });
-                const matBond = new THREE.MeshPhysicalMaterial({ color: 0xd1d1d6, roughness: 0.28, metalness: 0.45, clearcoat: 0.5 });
+                // Ceramic / Anodized Metal Apple PBR Materials (auto-uses lighter MeshStandardMaterial on mobile GPUs)
+                function makePBRMat(opts) {
+                    if (isMobilePerf) {
+                        const { clearcoat, clearcoatRoughness, ...stdOpts } = opts;
+                        return new THREE.MeshStandardMaterial(stdOpts);
+                    }
+                    return new THREE.MeshPhysicalMaterial(opts);
+                }
+
+                const matCAlpha = makePBRMat({ color: 0x2c2c2e, roughness: 0.2, metalness: 0.25, clearcoat: 0.9, clearcoatRoughness: 0.12 });
+                const matCarbon = makePBRMat({ color: 0x636366, roughness: 0.24, metalness: 0.2, clearcoat: 0.8, clearcoatRoughness: 0.15 });
+                const matNitrogen = makePBRMat({ color: 0x0a84ff, roughness: 0.18, metalness: 0.12, clearcoat: 0.95, clearcoatRoughness: 0.1 });
+                const matOxygen = makePBRMat({ color: 0xff3b30, roughness: 0.16, metalness: 0.1, clearcoat: 0.95, clearcoatRoughness: 0.08 });
+                const matHydrogen = makePBRMat({ color: 0xf5f5f7, roughness: 0.22, metalness: 0.05, clearcoat: 0.85, clearcoatRoughness: 0.12 });
+                const matRGroup = makePBRMat({ color: 0xff9f0a, roughness: 0.18, metalness: 0.15, clearcoat: 0.95, clearcoatRoughness: 0.1 });
+                const matSulfur = makePBRMat({ color: 0xffd60a, roughness: 0.18, metalness: 0.15, clearcoat: 0.92, clearcoatRoughness: 0.1 });
+                const matBond = makePBRMat({ color: 0xd1d1d6, roughness: 0.28, metalness: 0.45, clearcoat: 0.5 });
                 const matClashGlow = new THREE.MeshBasicMaterial({ color: 0xff3b30, transparent: true, opacity: 0.34, depthWrite: false });
 
                 const strandColors = [0x64d2ff, 0xff9f0a, 0xff375f];
-                const strandMats = strandColors.map(hex => new THREE.MeshPhysicalMaterial({
+                const strandMats = strandColors.map(hex => makePBRMat({
                     color: hex, roughness: 0.18, metalness: 0.15, clearcoat: 0.92, clearcoatRoughness: 0.1
                 }));
-                const ribbonMats = strandColors.map(hex => new THREE.MeshPhysicalMaterial({
+                const ribbonMats = strandColors.map(hex => makePBRMat({
                     color: hex, transparent: true, opacity: 0.3, roughness: 0.15, clearcoat: 0.85, depthWrite: false
                 }));
                 const matHBondDashed = new THREE.LineDashedMaterial({ color: 0xbf5af2, dashSize: 0.17, gapSize: 0.11 });
 
-                // Cached unit geometries (high-res for single residue, optimized for instanced multi-residue chains)
-                const unitSphereGeo = new THREE.SphereGeometry(1, 36, 28);
-                const unitCylGeo = new THREE.CylinderGeometry(1, 1, 1, 18);
-                const chainSphereGeo = new THREE.SphereGeometry(1, 22, 16);
-                const chainCylGeo = new THREE.CylinderGeometry(1, 1, 1, 12);
+                // Cached unit geometries (adaptive detail for smooth 60fps on mobile GPUs)
+                const unitSphereGeo = new THREE.SphereGeometry(1, isMobilePerf ? 20 : 36, isMobilePerf ? 14 : 28);
+                const unitCylGeo = new THREE.CylinderGeometry(1, 1, 1, isMobilePerf ? 10 : 18);
+                const chainSphereGeo = new THREE.SphereGeometry(1, isMobilePerf ? 12 : 22, isMobilePerf ? 10 : 16);
+                const chainCylGeo = new THREE.CylinderGeometry(1, 1, 1, isMobilePerf ? 8 : 12);
 
                 function createSphere(radius, material, pos) {
                     const mesh = new THREE.Mesh(unitSphereGeo, material);
@@ -152,7 +164,7 @@
                     shape.quadraticCurveTo(x, y, x + r, y);
 
                     const group = new THREE.Group();
-                    const plateMat = new THREE.MeshPhysicalMaterial({
+                    const plateMat = makePBRMat({
                         color: colorHex,
                         transparent: true,
                         opacity: 0.22,
@@ -221,7 +233,7 @@
                 function syncLeaderCanvasSize() {
                     const w = threeContainer.clientWidth || 560;
                     const h = threeContainer.clientHeight || 460;
-                    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+                    const dpr = targetDPR;
                     labelLeaderCanvas.width = Math.round(w * dpr);
                     labelLeaderCanvas.height = Math.round(h * dpr);
                     leaderCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -631,7 +643,7 @@
                 chainGroup.visible = false;
                 scene.add(chainGroup);
 
-                const matRibbonSingle = new THREE.MeshPhysicalMaterial({
+                const matRibbonSingle = makePBRMat({
                     color: 0x64d2ff,
                     transparent: true,
                     opacity: 0.28,
@@ -767,7 +779,7 @@
                     if (!showTripleHelix) {
                         // Sleek translucent backbone ribbon curve
                         const curve = new THREE.CatmullRomCurve3(baseStrand.caList);
-                        const tubeGeo = new THREE.TubeGeometry(curve, 72, 0.24, 12, false);
+                        const tubeGeo = new THREE.TubeGeometry(curve, isMobilePerf ? 40 : 72, 0.24, isMobilePerf ? 8 : 12, false);
                         chainGroup.add(new THREE.Mesh(tubeGeo, matRibbonSingle));
 
                         addInstancedSpheres(chainGroup, baseStrand.nList, 0.32, matNitrogen);
@@ -865,7 +877,7 @@
                             addInstancedBonds(chainGroup, strandBonds, 0.125, strandMats[s]);
 
                             const sCurve = new THREE.CatmullRomCurve3(sCA);
-                            chainGroup.add(new THREE.Mesh(new THREE.TubeGeometry(sCurve, 64, 0.22, 12, false), ribbonMats[s]));
+                            chainGroup.add(new THREE.Mesh(new THREE.TubeGeometry(sCurve, isMobilePerf ? 36 : 64, 0.22, isMobilePerf ? 7 : 12, false), ribbonMats[s]));
                             allStrands.push({ sCA, sN, sO });
                         }
 
@@ -917,11 +929,11 @@
                 pdbGroup.visible = false;
                 scene.add(pdbGroup);
 
-                const matPDBFavored = new THREE.MeshPhysicalMaterial({ color: 0x34c759, roughness: 0.2, metalness: 0.12, clearcoat: 0.9 });
-                const matPDBAllowed = new THREE.MeshPhysicalMaterial({ color: 0xff9f0a, roughness: 0.2, metalness: 0.12, clearcoat: 0.9 });
-                const matPDBOutlier = new THREE.MeshPhysicalMaterial({ color: 0xff3b30, roughness: 0.15, metalness: 0.15, clearcoat: 0.95, emissive: 0x660000 });
-                const matPDBTerm = new THREE.MeshPhysicalMaterial({ color: 0x8e8e93, roughness: 0.25, metalness: 0.2, clearcoat: 0.8 });
-                const matPDBRibbon = new THREE.MeshPhysicalMaterial({ color: 0x64d2ff, transparent: true, opacity: 0.28, roughness: 0.15, clearcoat: 0.85, depthWrite: false });
+                const matPDBFavored = makePBRMat({ color: 0x34c759, roughness: 0.2, metalness: 0.12, clearcoat: 0.9 });
+                const matPDBAllowed = makePBRMat({ color: 0xff9f0a, roughness: 0.2, metalness: 0.12, clearcoat: 0.9 });
+                const matPDBOutlier = makePBRMat({ color: 0xff3b30, roughness: 0.15, metalness: 0.15, clearcoat: 0.95, emissive: 0x660000 });
+                const matPDBTerm = makePBRMat({ color: 0x8e8e93, roughness: 0.25, metalness: 0.2, clearcoat: 0.8 });
+                const matPDBRibbon = makePBRMat({ color: 0x64d2ff, transparent: true, opacity: 0.28, roughness: 0.15, clearcoat: 0.85, depthWrite: false });
                 const matPDBHighlight = new THREE.MeshBasicMaterial({ color: 0x64d2ff, transparent: true, opacity: 0.45, depthWrite: false });
 
                 let pdbSelectHalo = null;

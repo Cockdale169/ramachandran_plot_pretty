@@ -97,7 +97,7 @@
         // ==========================================
         let isDraggingPlot = false;
 
-        function handlePlotPointer(e) {
+        function handlePlotPointer(e, deferred = false) {
             const rect = ramaCanvas.getBoundingClientRect();
             const x = ((e.clientX - rect.left) / rect.width) * LOGICAL_SIZE;
             const y = ((e.clientY - rect.top) / rect.height) * LOGICAL_SIZE;
@@ -130,7 +130,16 @@
             degPhi = Math.max(-180, Math.min(180, degPhi));
             degPsi = Math.max(-180, Math.min(180, degPsi));
 
-            setAngles(degPhi, degPsi);
+            setAngles(degPhi, degPsi, deferred);
+        }
+
+        let _interactiveRaf = 0;
+        function scheduleInteractiveUpdate() {
+            if (_interactiveRaf) return;
+            _interactiveRaf = requestAnimationFrame(() => {
+                _interactiveRaf = 0;
+                updateAll();
+            });
         }
 
         ramaCanvas.addEventListener('pointerdown', (e) => {
@@ -139,7 +148,7 @@
             handlePlotPointer(e);
         });
         ramaCanvas.addEventListener('pointermove', (e) => {
-            if (isDraggingPlot) handlePlotPointer(e);
+            if (isDraggingPlot) handlePlotPointer(e, true);
         });
         ramaCanvas.addEventListener('pointerup', () => {
             isDraggingPlot = false;
@@ -148,12 +157,13 @@
             isDraggingPlot = false;
         });
 
-        function setAngles(phi, psi) {
+        function setAngles(phi, psi, deferred = false) {
             currentPhi = phi;
             currentPsi = psi;
             phiSlider.value = phi;
             psiSlider.value = psi;
-            updateAll();
+            if (deferred) scheduleInteractiveUpdate();
+            else updateAll();
         }
 
         function setAminoAcid(aa) {
@@ -257,9 +267,9 @@
             updateAll();
         });
 
-        phiSlider.addEventListener('input', (e) => { currentPhi = parseInt(e.target.value, 10); updateAll(); });
-        psiSlider.addEventListener('input', (e) => { currentPsi = parseInt(e.target.value, 10); updateAll(); });
-        omegaSlider.addEventListener('input', (e) => { currentOmega = parseInt(e.target.value, 10); updateAll(); });
+        phiSlider.addEventListener('input', (e) => { currentPhi = parseInt(e.target.value, 10); scheduleInteractiveUpdate(); });
+        psiSlider.addEventListener('input', (e) => { currentPsi = parseInt(e.target.value, 10); scheduleInteractiveUpdate(); });
+        omegaSlider.addEventListener('input', (e) => { currentOmega = parseInt(e.target.value, 10); scheduleInteractiveUpdate(); });
 
         lockOmegaChk.addEventListener('change', (e) => {
             omegaSlider.disabled = e.target.checked;
