@@ -591,6 +591,15 @@
             min-width: 0;
             max-width: 100%;
         }
+        .rcsb-row {
+            min-width: 0;
+            max-width: 100%;
+        }
+        .rcsb-input {
+            flex: 1 1 0;
+            min-width: 0;
+            width: 0;
+        }
 
         .card {
             background: var(--bg-surface);
@@ -2084,6 +2093,11 @@
                 -webkit-backdrop-filter: none;
                 background: rgba(18, 22, 31, 0.88);
             }
+            /* Prevent browser scroll from fighting 3D touch orbit on mobile */
+            #threeContainer,
+            #threeContainer canvas {
+                touch-action: none;
+            }
         }
 
         @media (max-width: 680px) {
@@ -2433,8 +2447,19 @@
             .card-title-row {
                 padding-bottom: 8px;
                 margin-bottom: 8px;
+                gap: 6px;
             }
-            .card-title-row h2 { font-size: 0.92rem; }
+            .card-title-row h2 { font-size: 0.9rem; }
+            .card-title-row > div { max-width: 100%; min-width: 0; }
+            .mode-switch {
+                max-width: 100%;
+                overflow: hidden;
+            }
+            .mode-btn {
+                padding: 4px 5px;
+                font-size: 0.67rem;
+                white-space: nowrap;
+            }
             .hint { font-size: 0.75rem; margin-bottom: 8px; }
             .studio-topbar {
                 padding: 6px 8px;

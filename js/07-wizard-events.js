@@ -29,9 +29,12 @@
                 misfoldAnimId = null;
             }
             currentStepIdx = Math.max(0, Math.min(STEPS_DATA.length - 1, idx));
-            const step = STEPS_DATA[currentStepIdx];
+            const step = getStepData(currentStepIdx);
+            const en = isEN();
 
-            navStepStatus.textContent = `第 ${currentStepIdx + 1} / ${STEPS_DATA.length} 步`;
+            navStepStatus.textContent = en
+                ? `Step ${currentStepIdx + 1} / ${STEPS_DATA.length}`
+                : `第 ${currentStepIdx + 1} / ${STEPS_DATA.length} 步`;
             if (wizardProgressFill) {
                 wizardProgressFill.style.width = `${((currentStepIdx + 1) / STEPS_DATA.length) * 100}%`;
             }
@@ -44,7 +47,9 @@
 
             prevStepBtn.disabled = currentStepIdx === 0;
             nextStepBtn.disabled = currentStepIdx === STEPS_DATA.length - 1;
-            nextStepBtn.textContent = currentStepIdx === STEPS_DATA.length - 1 ? '已完成全部課程 🎉' : '下一步 →';
+            nextStepBtn.textContent = currentStepIdx === STEPS_DATA.length - 1
+                ? (en ? 'Course Completed 🎉' : '已完成全部課程 🎉')
+                : (en ? 'Next →' : '下一步 →');
 
             wizBadge.textContent = step.badge;
             wizTitle.textContent = step.title;
@@ -181,27 +186,48 @@
 
         function setPlotMode(mode) {
             plotMode = mode;
+            const en = isEN();
             modeProBtn.classList.toggle('active', mode === 'pro');
             modeEnergyBtn.classList.toggle('active', mode === 'energy');
             modeSimpleBtn.classList.toggle('active', mode === 'simple');
             if (mode === 'pro') {
-                plotLegend.innerHTML = `
+                plotLegend.innerHTML = en ? `
+                    <span class="badge favored">Dark Blue Contour: Favored Core</span>
+                    <span class="badge allowed-pro">Light Blue Contour: Allowed Region</span>
+                ` : `
                     <span class="badge favored">深藍實線內：最有利核心區 (Favored)</span>
                     <span class="badge allowed-pro">淺藍外圈內：額外容許區 (Allowed)</span>
                 `;
             } else if (mode === 'energy') {
-                plotLegend.innerHTML = `
+                plotLegend.innerHTML = en ? `
+                    <span class="badge favored">Deep Blue/Teal: Low Free Energy (0–1.5 kcal/mol)</span>
+                    <span class="badge allowed-pro">Amber/White: High Steric Barrier (E = −kT ln P)</span>
+                ` : `
                     <span class="badge favored">深藍/青綠：低自由能盆地 (0 ~ 1.5 kcal/mol)</span>
                     <span class="badge allowed-pro">琥珀/橘白：高能立體阻礙障壁 (E = -kT ln P)</span>
                 `;
             } else {
-                plotLegend.innerHTML = `
+                plotLegend.innerHTML = en ? `
+                    <span class="badge beta">Top-Left: β-Sheet</span>
+                    <span class="badge alpha-r">Bottom-Left: Right α-Helix</span>
+                    <span class="badge alpha-l">Top-Right: Left α-Helix</span>
+                ` : `
                     <span class="badge beta">左上：β-摺疊</span>
                     <span class="badge alpha-r">左下：右手 α-螺旋</span>
                     <span class="badge alpha-l">右上：左手 α-螺旋</span>
                 `;
             }
             drawRamachandranPlot(currentPhi, currentPsi, currentAA);
+        }
+
+        function updateViewHintText() {
+            if (viewMode === 'single') {
+                threeHint.innerHTML = isEN()
+                    ? '<strong>Single Residue:</strong> Blue dashed line = <strong>φ axis</strong>, green dashed line = <strong>ψ axis</strong>. Use the toolbar to look down either axis.'
+                    : '<strong>單關節模式：</strong>藍色虛線是 <strong>φ 轉軸</strong>，綠色虛線是 <strong>ψ 轉軸</strong>，可點擊上方按鈕平滑俯視轉軸。';
+            } else {
+                updateChainHintText();
+            }
         }
 
         function setViewMode(mode) {
@@ -214,23 +240,26 @@
                 tripleHelixRow.style.display = 'none';
                 camPhiBtn.style.display = 'inline-block';
                 camPsiBtn.style.display = 'inline-block';
-                threeHint.innerHTML = '<strong>單關節模式：</strong>藍色虛線是 <strong>φ 轉軸</strong>，綠色虛線是 <strong>ψ 轉軸</strong>，可點擊上方按鈕平滑俯視轉軸。';
             } else {
                 viewChainBtn.classList.add('active');
                 viewSingleBtn.classList.remove('active');
                 tripleHelixRow.style.display = 'flex';
                 camPhiBtn.style.display = 'none';
                 camPsiBtn.style.display = 'none';
-                updateChainHintText();
             }
+            updateViewHintText();
             if (setViewMode3DFn) setViewMode3DFn(mode);
         }
 
         function updateChainHintText() {
             if (showTripleHelix) {
-                threeHint.innerHTML = '<strong>三股超螺旋模式 (3 Chains)：</strong>3 條 NeRF 計算的多肽鏈並排纏繞，紫色虛線為<strong>跨鏈氫鍵</strong>。';
+                threeHint.innerHTML = isEN()
+                    ? '<strong>Collagen Triple Helix (3 Chains):</strong> Three NeRF-built polypeptide strands intertwined with purple <strong>inter-chain H-bonds</strong>.'
+                    : '<strong>三股超螺旋模式 (3 Chains)：</strong>3 條 NeRF 計算的多肽鏈並排纏繞，紫色虛線為<strong>跨鏈氫鍵</strong>。';
             } else {
-                threeHint.innerHTML = '<strong>單股 12 殘基多肽鏈模式：</strong>將同一組 (φ, ψ) 連續重複 12 次，紫色虛線代表自動形成的<strong>鏈內氫鍵</strong>。';
+                threeHint.innerHTML = isEN()
+                    ? '<strong>12-Residue Polypeptide Chain:</strong> Repeats the current (φ, ψ) 12 times; purple dashed lines show <strong>intra-chain H-bonds</strong>.'
+                    : '<strong>單股 12 殘基多肽鏈模式：</strong>將同一組 (φ, ψ) 連續重複 12 次，紫色虛線代表自動形成的<strong>鏈內氫鍵</strong>。';
             }
         }
 
@@ -339,7 +368,9 @@
             const duration = 2600;
             const startTime = performance.now();
 
-            threeCaption.innerHTML = "🧠 <strong>疾病演示進行中：</strong>健康的 α-螺旋正在失去鏈內氫鍵並拉直成異常 β-摺疊（普里昂蛋白與類澱粉斑塊致病機制）...";
+            threeCaption.innerHTML = isEN()
+                ? "🧠 <strong>Misfolding Demo Running:</strong> Healthy α-helix is losing intra-chain H-bonds and extending into abnormal β-sheet (Prion / Amyloid plaque mechanism)..."
+                : "🧠 <strong>疾病演示進行中：</strong>健康的 α-螺旋正在失去鏈內氫鍵並拉直成異常 β-摺疊（普里昂蛋白與類澱粉斑塊致病機制）...";
 
             function stepAnim(now) {
                 const t = Math.min(1, (now - startTime) / duration);
@@ -351,7 +382,9 @@
                     misfoldAnimId = requestAnimationFrame(stepAnim);
                 } else {
                     misfoldAnimId = null;
-                    threeCaption.innerHTML = "⚠️ <strong>異常折疊完成：</strong>原本獨立的螺旋彈簧已拉直成 β-摺疊長鏈，在腦部容易互相堆疊沉積成不溶性斑塊！";
+                    threeCaption.innerHTML = isEN()
+                        ? "⚠️ <strong>Misfolding Complete:</strong> The isolated α-helix has unraveled into an extended β-strand prone to stacking into insoluble amyloid plaques!"
+                        : "⚠️ <strong>異常折疊完成：</strong>原本獨立的螺旋彈簧已拉直成 β-摺疊長鏈，在腦部容易互相堆疊沉積成不溶性斑塊！";
                 }
             }
             misfoldAnimId = requestAnimationFrame(stepAnim);
@@ -366,7 +399,9 @@
         const toggleLabelsBtn = document.getElementById('toggleLabelsBtn');
         toggleLabelsBtn.addEventListener('click', () => {
             showLabels3D = !showLabels3D;
-            toggleLabelsBtn.textContent = showLabels3D ? '標籤: 開' : '標籤: 關';
+            toggleLabelsBtn.textContent = isEN()
+                ? (showLabels3D ? 'Labels: ON' : 'Labels: OFF')
+                : (showLabels3D ? '標籤: 開' : '標籤: 關');
             toggleLabelsBtn.classList.toggle('active', showLabels3D);
             if (setLabels3DFn) setLabels3DFn(showLabels3D);
         });

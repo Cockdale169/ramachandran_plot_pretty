@@ -8,7 +8,9 @@
         async function init3DEngine() {
             try {
                 const THREE = await import('three');
-                const { TrackballControls } = await import('three/addons/controls/TrackballControls.js');
+                const isMobilePerf = (window.matchMedia && window.matchMedia('(pointer: coarse)').matches)
+                    || Math.min(window.innerWidth, window.innerHeight) <= 680;
+                const targetDPR = Math.min(window.devicePixelRatio || 1, isMobilePerf ? 1.35 : 2);
 
                 const scene = new THREE.Scene();
                 const width = threeContainer.clientWidth || 560;
@@ -16,15 +18,12 @@
                 const camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 320);
                 camera.position.set(0, 2.8, 9.6);
 
-                const isMobilePerf = (window.matchMedia && window.matchMedia('(pointer: coarse)').matches)
-                    || Math.min(window.innerWidth, window.innerHeight) <= 680;
-                const targetDPR = Math.min(window.devicePixelRatio || 1, isMobilePerf ? 1.35 : 2);
-
                 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
                 renderer.setSize(width, height);
                 renderer.setPixelRatio(targetDPR);
                 renderer.toneMapping = THREE.ACESFilmicToneMapping;
                 renderer.toneMappingExposure = 1.15;
+                if (isMobilePerf) renderer.domElement.style.touchAction = 'none';
                 threeContainer.appendChild(renderer.domElement);
 
                 // Studio Environment Reflection (Apple Hardware Keynote look)
@@ -40,15 +39,29 @@
                     // Fallback gracefully if RoomEnvironment unavailable
                 }
 
-                // Unrestricted 360° Free-Tumble TrackballControls (No Pole Lock, Wide Zoom, Silky Damping)
-                const controls = new TrackballControls(camera, renderer.domElement);
-                controls.rotateSpeed = 2.8;
-                controls.zoomSpeed = 1.45;
-                controls.panSpeed = 0.85;
-                controls.staticMoving = false;
-                controls.dynamicDampingFactor = 0.14;
-                controls.minDistance = 1.2;
-                controls.maxDistance = 140;
+                // Controls: Desktop uses unrestricted 360° TrackballControls; Mobile uses smooth touch-native OrbitControls
+                let controls;
+                if (isMobilePerf) {
+                    const { OrbitControls } = await import('three/addons/controls/OrbitControls.js');
+                    controls = new OrbitControls(camera, renderer.domElement);
+                    controls.enableDamping = true;
+                    controls.dampingFactor = 0.08;
+                    controls.rotateSpeed = 0.72;
+                    controls.zoomSpeed = 0.9;
+                    controls.enablePan = false;
+                    controls.minDistance = 2.0;
+                    controls.maxDistance = 130;
+                } else {
+                    const { TrackballControls } = await import('three/addons/controls/TrackballControls.js');
+                    controls = new TrackballControls(camera, renderer.domElement);
+                    controls.rotateSpeed = 2.8;
+                    controls.zoomSpeed = 1.45;
+                    controls.panSpeed = 0.85;
+                    controls.staticMoving = false;
+                    controls.dynamicDampingFactor = 0.14;
+                    controls.minDistance = 1.2;
+                    controls.maxDistance = 140;
+                }
 
                 // On-demand render scheduler (0% idle CPU/GPU when scene is static)
                 let renderRequested = false;
@@ -314,10 +327,11 @@
                         v.y = v.ay + dy * 30;
                     });
 
-                    // Iterative 2D AABB Collision Resolution (guaranteed zero overlap!)
+                    // Iterative 2D AABB Collision Resolution (lighter on mobile for smooth touch orbit)
                     const padX = 8, padY = 6;
                     const margin = 12;
-                    for (let iter = 0; iter < 10; iter++) {
+                    const maxIter = isMobilePerf ? 4 : 10;
+                    for (let iter = 0; iter < maxIter; iter++) {
                         for (let i = 0; i < visibleItems.length; i++) {
                             for (let j = i + 1; j < visibleItems.length; j++) {
                                 const a = visibleItems[i];
@@ -571,7 +585,7 @@
                         const hPos = new THREE.Vector3(0, 0.85, -0.65);
                         rBetaMesh = addSCAtom(0.24, matHydrogen, hPos);
                         sideChainGroup.add(createBond(new THREE.Vector3(0, 0, 0), hPos, 0.075));
-                        registerLabel('H (甘胺酸無側鏈)', '#30d158', rBetaMesh, new THREE.Vector3(0, 0, 0), 'sidechain');
+                        registerLabel(isEN() ? 'H (Gly)' : 'H (甘胺酸無側鏈)', '#30d158', rBetaMesh, new THREE.Vector3(0, 0, 0), 'sidechain');
                     } else if (key === 'PRO') {
                         const cBetaPos = new THREE.Vector3(-0.22, 0.96, -0.72);
                         const cGammaPos = new THREE.Vector3(-1.12, 1.48, -0.78);
@@ -585,7 +599,7 @@
                             createBond(cGammaPos, cDeltaPos, 0.105),
                             createBond(cDeltaPos, nPos, 0.105)
                         );
-                        registerLabel('Pro 五元鎖死環', '#ff9f0a', cGammaMesh, new THREE.Vector3(0, 0, 0), 'sidechain');
+                        registerLabel(isEN() ? 'Pro 5-Ring' : 'Pro 五元鎖死環', '#ff9f0a', cGammaMesh, new THREE.Vector3(0, 0, 0), 'sidechain');
                     } else {
                         const caZero = new THREE.Vector3(0, 0, 0);
                         const cbPos = new THREE.Vector3(0, 1.05, -0.82);
@@ -620,7 +634,10 @@
                         }
 
                         const scColor = AA_GROUP_INFO[aaInfo.group] ? AA_GROUP_INFO[aaInfo.group].color : '#ff9f0a';
-                        const scText = key === 'PREPRO' ? 'Pre-Pro (示意 R)' : `${aaInfo.zh} (${key.charAt(0) + key.slice(1).toLowerCase()})`;
+                        const code3 = key.charAt(0) + key.slice(1).toLowerCase();
+                        const scText = key === 'PREPRO'
+                            ? (isEN() ? 'Pre-Pro (R)' : 'Pre-Pro (示意 R)')
+                            : (isEN() ? `${aaInfo.en} (${code3})` : `${aaInfo.zh} (${code3})`);
                         registerLabel(scText, scColor, labelAnchor, new THREE.Vector3(0, 0, 0), 'sidechain');
                     }
 
@@ -1141,9 +1158,12 @@
                         ].sort((a, b) => (a.distA - a.safeA) - (b.distA - b.safeA));
 
                         const closest = pairs[0];
+                        const en = isEN();
                         if (evalResult.status === 'clash') {
                             distanceHud.className = 'distance-hud danger';
-                            distanceHud.textContent = `💥 碰撞：${closest.name} ${closest.distA.toFixed(2)} Å (下限 ${closest.safeA.toFixed(2)} Å)`;
+                            distanceHud.textContent = en
+                                ? `💥 Clash: ${closest.name.replace('R基', 'R').replace('(左)', '(L)')} ${closest.distA.toFixed(2)} Å (min ${closest.safeA.toFixed(2)} Å)`
+                                : `💥 碰撞：${closest.name} ${closest.distA.toFixed(2)} Å (下限 ${closest.safeA.toFixed(2)} Å)`;
                             clashSphere1.position.copy(closest.p1);
                             clashSphere2.position.copy(closest.p2);
                             clashSphere1.visible = true;
@@ -1155,19 +1175,48 @@
                             clashLine.visible = true;
                         } else {
                             distanceHud.className = 'distance-hud';
-                            distanceHud.textContent = `📏 最近距離：${closest.name} = ${closest.distA.toFixed(2)} Å (安全)`;
+                            distanceHud.textContent = en
+                                ? `📏 Closest: ${closest.name.replace('R基', 'R').replace('(左)', '(L)')} = ${closest.distA.toFixed(2)} Å (Safe)`
+                                : `📏 最近距離：${closest.name} = ${closest.distA.toFixed(2)} Å (安全)`;
                             clashSphere1.visible = false;
                             clashSphere2.visible = false;
                             clashLine.visible = false;
                         }
                     } else {
                         distanceHud.className = evalResult.status === 'clash' ? 'distance-hud danger' : 'distance-hud';
-                        const resTag = AMINO_ACIDS[currentResidue] ? AMINO_ACIDS[currentResidue].zh : '';
+                        const resObj = AMINO_ACIDS[currentResidue];
+                        const resTag = resObj ? (isEN() ? resObj.en : resObj.zh) : '';
                         distanceHud.textContent = showTripleHelix
-                            ? `🧬 三股 NeRF 螺旋 (${phiDeg}°, ${psiDeg}°)`
-                            : `🧬 12 殘基多肽鏈 · ${resTag} (${phiDeg}°, ${psiDeg}°)`;
+                            ? (isEN() ? `🧬 Triple NeRF Helix (${phiDeg}°, ${psiDeg}°)` : `🧬 三股 NeRF 螺旋 (${phiDeg}°, ${psiDeg}°)`)
+                            : (isEN() ? `🧬 12-Residue Chain · ${resTag} (${phiDeg}°, ${psiDeg}°)` : `🧬 12 殘基多肽鏈 · ${resTag} (${phiDeg}°, ${psiDeg}°)`);
                         buildPolypeptideScene(phiDeg, psiDeg, omegaDeg, currentAA);
                     }
+                    requestRender(true);
+                };
+
+                refreshLabelsLang3DFn = () => {
+                    const en = isEN();
+                    const zhToEn = {
+                        'Cα 關節': 'Cα Joint',
+                        'N (氮)': 'N',
+                        'O (氧)': 'O',
+                        "C' (碳)": "C'",
+                        'N端 (起點)': 'N-term',
+                        'C端 (終點)': 'C-term',
+                        'H (甘胺酸無側鏈)': 'H (Gly)',
+                        'Pro 五元鎖死環': 'Pro 5-Ring'
+                    };
+                    const enToZh = Object.fromEntries(Object.entries(zhToEn).map(([k, v]) => [v, k]));
+                    const map = en ? zhToEn : enToZh;
+                    activeLabels.forEach(item => {
+                        if (map[item.text]) {
+                            item.text = map[item.text];
+                            const sp = item.el.querySelector('span:last-child');
+                            if (sp) sp.textContent = item.text;
+                            item.w = 0;
+                        }
+                    });
+                    if (viewMode === 'single' && rebuildSideChainFn) rebuildSideChainFn(currentResidue);
                     requestRender(true);
                 };
 
@@ -1177,7 +1226,7 @@
                     camera.aspect = newW / newH;
                     camera.updateProjectionMatrix();
                     renderer.setSize(newW, newH);
-                    controls.handleResize();
+                    if (typeof controls.handleResize === 'function') controls.handleResize();
                     syncLeaderCanvasSize();
                     requestRender(true);
                 };
@@ -1277,6 +1326,7 @@
 
                 goToStep(0);
                 applyURLParams();
+                applyLanguage(currentLang);
                 requestRender(true);
 
             } catch (err) {

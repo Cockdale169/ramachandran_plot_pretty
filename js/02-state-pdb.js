@@ -69,6 +69,7 @@
         let selectPDBResidue3DFn = null;
         let clearPDB3DFn = null;
         let buildDemoPDBTextFn = null;
+        let refreshLabelsLang3DFn = null;
 
         // P2: PDB State
         let pdbData = null; // { name, residues: [{ chain, resSeq, resName, aaClass, phi, psi, omega, status, ca, n, c, o }], selectedIdx }
@@ -244,7 +245,13 @@
             aaSelect.value = currentResidue;
             renderAAInfoCard(currentResidue);
 
-            const statusMap = {
+            const en = isEN();
+            const statusMap = en ? {
+                favored: { cls: 'safe', icon: '✅', label: 'Favored Core' },
+                allowed: { cls: 'allowed', icon: '⚠️', label: 'Allowed Region' },
+                outlier: { cls: 'clash', icon: '⛔', label: 'Steric Outlier!' },
+                terminal: { cls: 'safe', icon: '🔹', label: 'Chain Terminus (N/C)' }
+            } : {
                 favored: { cls: 'safe', icon: '✅', label: 'Favored 核心安全區' },
                 allowed: { cls: 'allowed', icon: '⚠️', label: 'Allowed 額外容許區' },
                 outlier: { cls: 'clash', icon: '⛔', label: 'Outlier 立體阻礙異常點！' },
@@ -254,8 +261,12 @@
             statusPanel.className = `status-panel ${st.cls}`;
             statusTitle.textContent = `${st.icon} ${r.resName} ${r.resSeq} (Chain ${r.chain}) — ${st.label}`;
             statusDesc.textContent = r.phi !== null && r.psi !== null
-                ? `實測主鏈二面角：φ = ${r.phi}°, ψ = ${r.psi}°, |ω| = ${r.omega}°。點擊拉氏圖上其他圓點或下方 Outlier 標籤可切換檢視。`
-                : '此殘基位於多肽鏈起點或終點，僅具單側二面角。';
+                ? (en
+                    ? `Measured backbone torsions: φ = ${r.phi}°, ψ = ${r.psi}°, |ω| = ${r.omega}°. Tap other plot dots or Outlier chips below to inspect.`
+                    : `實測主鏈二面角：φ = ${r.phi}°, ψ = ${r.psi}°, |ω| = ${r.omega}°。點擊拉氏圖上其他圓點或下方 Outlier 標籤可切換檢視。`)
+                : (en
+                    ? 'Terminal residue at the N- or C-terminus with only one backbone dihedral angle.'
+                    : '此殘基位於多肽鏈起點或終點，僅具單側二面角。');
 
             document.querySelectorAll('.pdb-chip').forEach(ch => {
                 ch.classList.toggle('selected', parseInt(ch.dataset.idx, 10) === idx);

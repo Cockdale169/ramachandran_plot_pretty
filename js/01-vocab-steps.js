@@ -15,6 +15,16 @@
             "氫鍵": "帶微正電的氫原子（N-H）與帶微負電的氧原子（C=O）之間的靜電吸引力，像微小的魔鬼氈把蛋白質固定成形。"
         };
 
+        const VOCAB_DICT_EN = {
+            "電子共振": { title: "Electron Resonance", desc: "Electrons from C=O delocalize into the adjacent C–N bond, giving it ~1.5-bond character that locks the peptide plane flat and rigid." },
+            "二面角": { title: "Dihedral Angle", desc: "The torsion angle (−180° to +180°) between two planes joined along a central bond acting like a door hinge." },
+            "順式/反式": { title: "cis / trans Configuration", desc: "trans (ω = 180°) places bulky Cα atoms on opposite sides; cis (ω = 0°) crowds them on the same side, causing steric clashes." },
+            "凡得瓦半徑": { title: "Van der Waals Radius", desc: "Each atom's personal space radius. When two non-bonded atoms get closer than the sum of their radii, electron clouds strongly repel." },
+            "立體阻礙": { title: "Steric Clash", desc: "Atoms have physical volume—forcing certain (φ, ψ) angles pushes two atoms into the same space." },
+            "二級結構": { title: "Secondary Structure", desc: "Regular local backbone folds stabilized by hydrogen bonds, mainly spring-like α-helices and pleated β-sheets." },
+            "氫鍵": { title: "Hydrogen Bond", desc: "Electrostatic attraction between a partially positive N–H hydrogen and a partially negative C=O oxygen—molecular Velcro holding folds together." }
+        };
+
         const tooltipEl = document.getElementById('vocabTooltip');
         const ttTitle = document.getElementById('ttTitle');
         const ttDesc = document.getElementById('ttDesc');
@@ -24,8 +34,13 @@
                 const key = el.getAttribute('data-term');
                 const showTip = (e) => {
                     if (!VOCAB_DICT[key]) return;
-                    ttTitle.textContent = `📖 ${key}`;
-                    ttDesc.textContent = VOCAB_DICT[key];
+                    if (isEN() && VOCAB_DICT_EN[key]) {
+                        ttTitle.textContent = `📖 ${VOCAB_DICT_EN[key].title}`;
+                        ttDesc.textContent = VOCAB_DICT_EN[key].desc;
+                    } else {
+                        ttTitle.textContent = `📖 ${key}`;
+                        ttDesc.textContent = VOCAB_DICT[key];
+                    }
                     tooltipEl.style.display = 'block';
                     const tipW = Math.min(310, window.innerWidth - 24);
                     const tipH = tooltipEl.offsetHeight || 110;
@@ -50,8 +65,8 @@
             if (tooltipEl.style.display === 'block') tooltipEl.style.display = 'none';
         }, { passive: true });
 
-        function v(word) {
-            return `<span class="vocab-term" data-term="${word}">${word}</span>`;
+        function v(word, enLabel) {
+            return `<span class="vocab-term" data-term="${word}">${enLabel || word}</span>`;
         }
 
         // ==========================================
@@ -140,4 +155,87 @@
                 setup: { view: "chain", plot: "pro", aa: "general", phi: -140, psi: 135, omega: 180, lockOmega: true, vdw: false, triple: false, questTarget: { phi: -57, psi: -47, name: "神秘結構 A" } }
             }
         ];
+
+        const STEPS_DATA_EN = [
+            {
+                badge: "Step 1 / 10: Peptide Bond Basics",
+                title: "Why is a protein backbone like rigid plates on hinges?",
+                text: `Two amino acids condense into a peptide bond. Because of ${v("電子共振", "electron resonance")}, the blue and green <strong>peptide planes</strong> have partial double-bond (1.5-bond) character and stay completely flat! The only rotatable swivel joint is the central dark <strong>Cα atom</strong>.`,
+                action: `<span>👉 Try it: Drag the 3D view to rotate, or click the button to highlight the locked peptide planes.</span>
+                         <button class="inline-demo-btn" id="demoResonanceBtn">▶ Pulse Rigid Peptide Planes</button>`,
+                caption: "💡 Key insight: Both the blue and green glass plates are rigid planes—only Cα in the middle can rotate."
+            },
+            {
+                badge: "Step 2 / 10: Two Torsion Angles",
+                title: "φ (Phi) and ψ (Psi) are simply two clock angles",
+                text: `Since only Cα bonds can spin, structural biologists name the left blue-axis ${v("二面角", "dihedral angle")} <strong>φ (Phi)</strong> and the right green-axis angle <strong>ψ (Psi)</strong>. These two angles form the X and Y axes of the Ramachandran plot.`,
+                action: `<span>👉 Try it: Click <strong>"Look down φ"</strong> in the 3D toolbar to align the camera along the N–Cα axis like a Newman projection!</span>`,
+                caption: "💡 Key insight: φ rotates the left blue axis (horizontal on plot); ψ rotates the right green axis (vertical on plot)."
+            },
+            {
+                badge: "Step 3 / 10: The Hidden Third Angle",
+                title: "Why does nature lock ω (Omega) at 180°?",
+                text: `Inside each peptide plane lies a third dihedral angle <strong>ω</strong> (${v("順式/反式", "cis / trans")}). Nature locks it at <strong>180° (trans)</strong> so neighboring Cα atoms alternate cleanly. Forcing it to 0° (cis) slams the atoms together!`,
+                action: `<span>👉 Try it: Uncheck "Lock ω = 180°" on the right and drag the ω slider toward 0° while watching the closest-atom distance HUD shrink!</span>`,
+                caption: "💡 Key insight: Because ω is fixed at 180°, a 2D (φ, ψ) Ramachandran plot captures almost the entire backbone conformation."
+            },
+            {
+                badge: "Step 4 / 10: Atomic Steric Clash",
+                title: "Why is most of the Ramachandran plot empty white space?",
+                text: `Atoms aren't dimensionless points—they have physical volume (${v("凡得瓦半徑", "Van der Waals radius")}). At <strong>(0°, 0°)</strong>, oxygen (O) and hydrogen (H) come closer than 2.40 Å, triggering severe ${v("立體阻礙", "steric clash")}.`,
+                action: `<span>👉 VDW space-filling spheres are ON at (0°, 0°)! Inspect the red pulsing clash spheres and distance HUD to see which atoms collide.</span>`,
+                caption: "⚠️ Clash warning: White zones are physically forbidden because electron clouds overlap—almost never observed in nature."
+            },
+            {
+                badge: "Step 5 / 10: Textbook Secondary Structures",
+                title: "Colored islands = conformational fingerprints of hair & silk",
+                text: `Proteins settle into the few clash-free zones that also form regular ${v("氫鍵", "hydrogen bonds")} (${v("二級結構", "secondary structures")}). The <strong>bottom-left</strong> is the spring-like <strong>right-handed α-helix (hair keratin)</strong>; the <strong>top-left</strong> is the extended <strong>β-sheet (silk fibroin)</strong>.`,
+                action: `<span>👉 Try it: Click "Right-handed α-Helix" and "Antiparallel β-Sheet" presets to watch the red dot jump between islands.</span>`,
+                caption: "✅ Safe zones: Bottom-left = Right α-helix (−57°, −47°); Top-left = Antiparallel β-sheet (−139°, +135°)."
+            },
+            {
+                badge: "Step 6 / 10: Real Research Contours",
+                title: "Why do real papers show smooth island contours?",
+                text: `Boxes are a beginner simplification. Real structural biologists survey thousands of crystal structures to map density contours: <strong>dark blue (Favored)</strong> is optimal; <strong>light blue (Allowed)</strong> is tighter but feasible.`,
+                action: `<span>👉 Switched to KDE Contours! Notice how the upper-left β basin splits into antiparallel β, parallel β, and collagen/PPII peaks.</span>`,
+                caption: "📊 Real data perspective: Over 98% of residues in high-resolution structures fall inside the dark-blue Favored core."
+            },
+            {
+                badge: "Step 7 / 10: Special Case 1 (The Gymnast)",
+                title: "Glycine: No side chain, maximum flexibility",
+                text: `Typical residues carry a bulky Cβ side chain that limits rotation. <strong>Glycine</strong> only has a tiny hydrogen atom—completely symmetric—unlocking the right half of the plot where normal residues clash!`,
+                action: `<span>👉 Observe the plot: Switching to Glycine reveals four symmetric blue islands with vastly expanded allowed area!</span>`,
+                caption: "🤸 Glycine role: Frequently found in tight protein turns where sharp backbone bends are essential."
+            },
+            {
+                badge: "Step 8 / 10: Special Case 2 (The Helix Breaker)",
+                title: "Proline: Locked by a 5-membered ring",
+                text: `The opposite of Glycine! <strong>Proline</strong>'s side chain loops back onto backbone N, forming a rigid 5-membered ring that locks <strong>φ near −60°</strong> and compresses the allowed region into a narrow vertical band.`,
+                action: `<span>👉 Drag the φ slider away from −60° and watch the steric clash warning trigger immediately!</span>`,
+                caption: "🔒 Proline role: Because φ cannot rotate freely, Proline often acts as an α-helix breaker."
+            },
+            {
+                badge: "Step 9 / 10: From Local Angles to Collagen & Disease",
+                title: "Polypeptide folding, collagen triple helix & misfolding",
+                text: `The 3D view is now in <strong>Polypeptide Chain mode</strong>. Repeating (−75°, +145°) across 3 intertwined chains forms inter-chain ${v("氫鍵", "hydrogen bonds")} and builds the tough <strong>collagen triple helix</strong> (skin & tendons).`,
+                action: `<span>👉 Try toggling "Collagen Triple Helix" or click "Misfolding Demo" to see an α-helix unravel into β-sheet amyloid plaques!</span>`,
+                caption: "🧬 Emergent architecture: Repeating local (φ, ψ) angles dictates macroscopic protein shape and biological function."
+            },
+            {
+                badge: "Step 10 / 10: Final 3-Stage Challenge",
+                title: "Self-Check: Can you read a Ramachandran plot on your own?",
+                text: `Complete these three hands-on challenges to verify your mastery of Ramachandran analysis:`,
+                action: `<span>🎯 Follow the purple mission box below by dragging on the plot or adjusting controls on the right:</span>`,
+                caption: "🏆 Final quiz active: Combine contours, 3D chain shape, and side-chain chemistry to clear all 3 stages!"
+            }
+        ];
+
+        function getStepData(idx) {
+            const base = STEPS_DATA[idx];
+            if (!base) return null;
+            if (isEN() && STEPS_DATA_EN[idx]) {
+                return Object.assign({}, base, STEPS_DATA_EN[idx]);
+            }
+            return base;
+        }
 

@@ -7,6 +7,9 @@
 // 幾何數值取自標準殘基幾何 (Engh & Huber 鍵長鍵角) 與最常見旋轉異構物 (rotamer) 的 χ 角。
 // ring: 需要額外補上的閉環鍵。
 
+let currentLang = 'en';
+function isEN() { return currentLang === 'en'; }
+
 const RAMA_CLASS_INFO = {
     general: { zh: '一般類別 (General)', en: 'General' },
     glycine: { zh: '甘胺酸類別 (Gly)', en: 'Glycine' },
@@ -16,11 +19,35 @@ const RAMA_CLASS_INFO = {
 };
 
 const AA_GROUP_INFO = {
-    special: { zh: '特殊', en: 'Special', color: '#af52de' },
-    nonpolar: { zh: '非極性．疏水', en: 'Nonpolar', color: '#ff9500' },
-    polar: { zh: '極性．不帶電', en: 'Polar', color: '#34c759' },
-    acidic: { zh: '酸性．帶負電', en: 'Acidic', color: '#ff3b30' },
-    basic: { zh: '鹼性．帶正電', en: 'Basic', color: '#0071e3' }
+    special: { zh: '特殊', en: 'Special', shortEn: 'Special', color: '#af52de' },
+    nonpolar: { zh: '非極性．疏水', en: 'Nonpolar · Hydrophobic', shortEn: 'Nonpolar', color: '#ff9500' },
+    polar: { zh: '極性．不帶電', en: 'Polar · Uncharged', shortEn: 'Polar', color: '#34c759' },
+    acidic: { zh: '酸性．帶負電', en: 'Acidic (−)', shortEn: 'Acidic', color: '#ff3b30' },
+    basic: { zh: '鹼性．帶正電', en: 'Basic (+)', shortEn: 'Basic', color: '#0071e3' }
+};
+
+const AA_NOTES_EN = {
+    GLY: 'Side chain is just a single H atom with no Cβ—symmetric and flexible, freely accessing the right half of the Ramachandran plot for tight turns.',
+    PRO: 'Side chain loops back to backbone N forming a 5-membered ring, locking φ near −63°; acts as a classic α-helix breaker.',
+    PREPRO: 'Not an amino acid itself, but any residue immediately preceding Proline. The adjacent Pro ring shrinks α-helix/αL zones and creates a unique ζ region (−140°, +80°).',
+    ALA: 'Small nonpolar methyl (−CH₃) side chain; the strongest α-helix former and the canonical General Ramachandran archetype.',
+    VAL: 'β-branched side chain (two carbons on Cβ) crowds the backbone in α-helices, strongly favoring extended β-sheets.',
+    LEU: 'Branches at Cγ (one bond further than Val), avoiding backbone steric clash—a strong α-helix former and hydrophobic core staple.',
+    ILE: 'β-branched hydrophobic residue grouped with Val in Top8000: broad β-sheet basin, narrower α-helix, almost no left-handed α.',
+    MET: 'Flexible unbranched sulfur-containing chain; favors α-helices and serves as the universal translation start residue.',
+    PHE: 'Bulky planar benzene ring buried in hydrophobic cores, with a slight preference for β-sheets.',
+    TRP: 'Largest of the 20 amino acids with a bicyclic indole ring; absorbs 280 nm UV light used to measure protein concentration.',
+    SER: 'Hydroxyl (−OH) competes for backbone H-bonds, common in turns and helix N-caps; a major phosphorylation site.',
+    THR: 'β-branched polar residue (O and C on Cβ) that favors β-sheets; grouped under General in Top8000 statistics.',
+    CYS: 'Thiol (−SH) can oxidize with another Cys to form covalent disulfide bonds (S–S) stabilizing folds like hair keratin.',
+    ASN: 'Amide side chain H-bonds to its own backbone, making it the most common non-Gly residue in the left-handed α region and turns.',
+    GLN: 'One CH₂ longer and more flexible than Asn; favors α-helices. Poly-Q expansions are linked to Huntington’s disease.',
+    TYR: 'Phenol ring with a terminal −OH for H-bonding and signaling phosphorylation; favors β-sheets.',
+    ASP: 'Short negatively charged side chain; frequently caps α-helix N-termini and participates in enzyme active sites.',
+    GLU: 'Longer negatively charged chain; one of the strongest α-helix formers, often forming i→i+4 salt bridges with Lys.',
+    LYS: 'Long positively charged chain on protein surfaces; favors α-helices and undergoes acetylation/ubiquitination.',
+    ARG: 'Planar positively charged guanidinium group forms multiple H-bonds and salt bridges, ideal for binding DNA/RNA phosphates.',
+    HIS: 'Imidazole ring has pKa ≈ 6, toggling protonation near physiological pH—essential in catalytic triads like serine proteases.'
 };
 
 const PHE_RING = [
@@ -342,7 +369,16 @@ let aaPickerFilter = 'all';
         }
     }
 
+    function renderFilterBar() {
+        const en = isEN();
+        filterBar.innerHTML = `
+            <button type="button" class="aa-filter-pill${aaPickerFilter === 'all' ? ' active' : ''}" data-group="all">${en ? 'All (21)' : '全部 (21)'}</button>
+            ${AA_GROUPS_ORDER.map(([g]) => `<button type="button" class="aa-filter-pill${aaPickerFilter === g ? ' active' : ''}" data-group="${g}"><span class="aa-dot" style="background:${AA_GROUP_INFO[g].color}"></span>${en ? AA_GROUP_INFO[g].shortEn : AA_GROUP_INFO[g].zh.split('．')[0]}</button>`).join('')}
+        `;
+    }
+
     function renderPickerGrid(activeKey) {
+        const en = isEN();
         const groupsToShow = aaPickerFilter === 'all'
             ? AA_GROUPS_ORDER
             : AA_GROUPS_ORDER.filter(([g]) => g === aaPickerFilter);
@@ -353,17 +389,18 @@ let aaPickerFilter = 'all';
                 const a = AMINO_ACIDS[k];
                 const isSel = k === activeKey;
                 const shortCode = k === 'PREPRO' ? 'Pre-P' : (k.charAt(0) + k.slice(1).toLowerCase());
+                const primaryName = en ? (k === 'PREPRO' ? 'Pre-Pro' : a.en) : (k === 'PREPRO' ? 'Pre-Pro' : a.zh);
                 return `<button type="button" class="aa-tile${isSel ? ' selected' : ''}" data-aa="${k}" role="option" aria-selected="${isSel}">
                     <span class="aa-tile-top">
                         <span class="aa-tile-letter">${a.one}</span>
                         <span class="aa-dot" style="background:${gInfo.color}"></span>
                     </span>
-                    <span class="aa-tile-zh">${k === 'PREPRO' ? 'Pre-Pro' : a.zh}</span>
+                    <span class="aa-tile-zh">${primaryName}</span>
                     <span class="aa-tile-code">${shortCode}</span>
                 </button>`;
             }).join('');
             return `<div class="aa-group-section">
-                <div class="aa-group-title">${gInfo.zh}</div>
+                <div class="aa-group-title">${en ? gInfo.en : gInfo.zh}</div>
                 <div class="aa-tile-grid">${tiles}</div>
             </div>`;
         }).join('');
@@ -375,6 +412,7 @@ let aaPickerFilter = 'all';
         popover.classList.toggle('open', open);
         trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
         if (open) {
+            renderFilterBar();
             renderPickerGrid(sel.value || 'ALA');
             positionPopover();
         }
@@ -419,9 +457,11 @@ let aaPickerFilter = 'all';
     });
 
     picker._renderGrid = renderPickerGrid;
+    picker._renderFilter = renderFilterBar;
 })();
 
 function renderAAInfoCard(key) {
+    const en = isEN();
     const a = AMINO_ACIDS[key] || AMINO_ACIDS.ALA;
     const g = AA_GROUP_INFO[a.group];
     const cls = RAMA_CLASS_INFO[a.cls];
@@ -436,20 +476,24 @@ function renderAAInfoCard(key) {
     const picker = document.getElementById('aaPicker');
     if (picker) picker.style.setProperty('--aa-accent', g.color);
     if (glyphEl) glyphEl.textContent = a.one;
-    if (zhEl) zhEl.textContent = a.zh;
-    if (subEl) subEl.textContent = `${a.en} · ${code3}`;
+    if (zhEl) zhEl.textContent = en ? a.en : a.zh;
+    if (subEl) subEl.textContent = en ? `${code3} · ${g.shortEn}` : `${a.en} · ${code3}`;
     if (clsEl) clsEl.textContent = cls.en;
-    if (picker && aaPickerOpen && picker._renderGrid) picker._renderGrid(key);
+    if (picker && aaPickerOpen) {
+        if (picker._renderFilter) picker._renderFilter();
+        if (picker._renderGrid) picker._renderGrid(key);
+    }
 
     // 同步下方資訊卡
     const card = document.getElementById('aaInfoCard');
     if (!card) return;
     card.style.setProperty('--aa-accent', g.color);
+    const noteText = en ? (AA_NOTES_EN[key] || a.note) : a.note;
     card.innerHTML = `
         <div class="aa-info-chips">
-            <span class="aa-chip aa-chip-group"><span class="aa-dot" style="background:${g.color}"></span>${g.zh}</span>
-            <span class="aa-chip">拉氏圖：${cls.zh}</span>
-            <span class="aa-chip">側鏈重原子 ${heavy}</span>
+            <span class="aa-chip aa-chip-group"><span class="aa-dot" style="background:${g.color}"></span>${en ? g.en : g.zh}</span>
+            <span class="aa-chip">${en ? 'Rama Class: ' + cls.en : '拉氏圖：' + cls.zh}</span>
+            <span class="aa-chip">${en ? 'Heavy Atoms: ' + heavy : '側鏈重原子 ' + heavy}</span>
         </div>
-        <p class="aa-info-note">${a.note}</p>`;
+        <p class="aa-info-note">${noteText}</p>`;
 }

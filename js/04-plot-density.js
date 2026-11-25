@@ -109,6 +109,16 @@
             cacheObj[key] = canvas;
         }
 
+        function clearContourCache() {
+            Object.keys(contourCache).forEach(k => {
+                if (contourCache[k]) {
+                    contourCache[k].width = 0;
+                    contourCache[k].height = 0;
+                }
+                delete contourCache[k];
+            });
+        }
+
         function generateEnergyCache(aaType, logicalW, logicalH) {
             const physW = Math.round(logicalW * DPR);
             const physH = Math.round(logicalH * DPR);
@@ -240,36 +250,37 @@
             const toPX = (deg) => ((deg + 180) / 360) * logicalW;
             const toPY = (deg) => ((180 - deg) / 360) * logicalH;
 
+            const en = isEN();
             if (aaType === 'general') {
-                drawCrispLabel(ctx, '反平行 β', toPX(-144), toPY(156), '#004080');
-                drawCrispLabel(ctx, '平行 β', toPX(-120), toPY(108), '#004080');
-                drawCrispLabel(ctx, 'PPII / 膠原', toPX(-66), toPY(156), '#004080');
-                drawCrispLabel(ctx, '右手 α', toPX(-62), toPY(-46), '#004080');
+                drawCrispLabel(ctx, en ? 'Antiparallel β' : '反平行 β', toPX(-144), toPY(156), '#004080');
+                drawCrispLabel(ctx, en ? 'Parallel β' : '平行 β', toPX(-120), toPY(108), '#004080');
+                drawCrispLabel(ctx, en ? 'PPII / Collagen' : 'PPII / 膠原', toPX(-66), toPY(156), '#004080');
+                drawCrispLabel(ctx, en ? 'Right α' : '右手 α', toPX(-62), toPY(-46), '#004080');
                 drawCrispLabel(ctx, '3₁₀', toPX(-84), toPY(-8), '#0055aa');
-                drawCrispLabel(ctx, '左手 α', toPX(57), toPY(45), '#004080');
+                drawCrispLabel(ctx, en ? 'Left α' : '左手 α', toPX(57), toPY(45), '#004080');
                 ctx.font = '500 9.5px -apple-system, sans-serif';
                 drawCrispLabel(ctx, 'γ-turn', toPX(75), toPY(-62), '#0071e3');
             } else if (aaType === 'glycine') {
-                drawCrispLabel(ctx, '右手 α 區', toPX(-65), toPY(-40), '#004080');
-                drawCrispLabel(ctx, '左手 α 區', toPX(68), toPY(35), '#004080');
+                drawCrispLabel(ctx, en ? 'Right α' : '右手 α 區', toPX(-65), toPY(-40), '#004080');
+                drawCrispLabel(ctx, en ? 'Left α' : '左手 α 區', toPX(68), toPY(35), '#004080');
                 drawCrispLabel(ctx, 'β / PPII', toPX(-125), toPY(158), '#004080');
-                drawCrispLabel(ctx, '對稱延伸區', toPX(125), toPY(-158), '#004080');
+                drawCrispLabel(ctx, en ? 'Symmetric β' : '對稱延伸區', toPX(125), toPY(-158), '#004080');
             } else if (aaType === 'proline') {
-                drawCrispLabel(ctx, 'PPII / 膠原島', toPX(-62), toPY(145), '#004080');
-                drawCrispLabel(ctx, 'α-螺旋島', toPX(-60), toPY(-35), '#004080');
+                drawCrispLabel(ctx, en ? 'PPII / Collagen' : 'PPII / 膠原島', toPX(-62), toPY(145), '#004080');
+                drawCrispLabel(ctx, en ? 'α-Helix' : 'α-螺旋島', toPX(-60), toPY(-35), '#004080');
                 ctx.font = '500 10px -apple-system, sans-serif';
-                drawCrispLabel(ctx, 'φ 被五元環鎖定在 -60° 附近', toPX(52), toPY(0), '#6e6e73');
+                drawCrispLabel(ctx, en ? 'φ locked near −60° by 5-ring' : 'φ 被五元環鎖定在 -60° 附近', toPX(52), toPY(0), '#6e6e73');
             } else if (aaType === 'ileval') {
-                drawCrispLabel(ctx, 'β-摺疊主峰 (偏好)', toPX(-124), toPY(136), '#004080');
-                drawCrispLabel(ctx, '右手 α (偏窄)', toPX(-63), toPY(-45), '#004080');
+                drawCrispLabel(ctx, en ? 'β-Sheet (Favored)' : 'β-摺疊主峰 (偏好)', toPX(-124), toPY(136), '#004080');
+                drawCrispLabel(ctx, en ? 'Right α (Narrow)' : '右手 α (偏窄)', toPX(-63), toPY(-45), '#004080');
                 ctx.font = '500 9.5px -apple-system, sans-serif';
-                drawCrispLabel(ctx, 'β-分支壓縮左手 α 區', toPX(68), toPY(42), '#6e6e73');
+                drawCrispLabel(ctx, en ? 'β-branch suppresses αL' : 'β-分支壓縮左手 α 區', toPX(68), toPY(42), '#6e6e73');
             } else if (aaType === 'prepro') {
                 drawCrispLabel(ctx, 'β / PPII', toPX(-104), toPY(148), '#004080');
-                drawCrispLabel(ctx, 'ζ 區 (Pre-Pro 特有)', toPX(-126), toPY(75), '#0055aa');
-                drawCrispLabel(ctx, '右手 α (縮小)', toPX(-63), toPY(-44), '#004080');
+                drawCrispLabel(ctx, en ? 'ζ Region (Pre-Pro)' : 'ζ 區 (Pre-Pro 特有)', toPX(-126), toPY(75), '#0055aa');
+                drawCrispLabel(ctx, en ? 'Right α (Smaller)' : '右手 α (縮小)', toPX(-63), toPY(-44), '#004080');
                 ctx.font = '500 9.5px -apple-system, sans-serif';
-                drawCrispLabel(ctx, '左手 α 幾乎消失', toPX(68), toPY(42), '#6e6e73');
+                drawCrispLabel(ctx, en ? 'Left α nearly forbidden' : '左手 α 幾乎消失', toPX(68), toPY(42), '#6e6e73');
             }
             ctx.restore();
             return offCanvas;
