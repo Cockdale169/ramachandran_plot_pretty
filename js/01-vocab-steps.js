@@ -27,17 +27,28 @@
                     ttTitle.textContent = `📖 ${key}`;
                     ttDesc.textContent = VOCAB_DICT[key];
                     tooltipEl.style.display = 'block';
-                    const x = Math.min(window.innerWidth - 326, Math.max(14, e.clientX - 40));
-                    const y = Math.min(window.innerHeight - 125, e.clientY + 18);
+                    const tipW = Math.min(310, window.innerWidth - 24);
+                    const tipH = tooltipEl.offsetHeight || 110;
+                    const x = Math.min(window.innerWidth - tipW - 12, Math.max(12, e.clientX - 40));
+                    let y = e.clientY + 18;
+                    if (y + tipH > window.innerHeight - 16) y = Math.max(12, e.clientY - tipH - 14);
                     tooltipEl.style.left = `${x}px`;
                     tooltipEl.style.top = `${y}px`;
                 };
                 el.addEventListener('mouseenter', showTip);
                 el.addEventListener('mousemove', showTip);
-                el.addEventListener('click', showTip);
+                el.addEventListener('click', (e) => { e.stopPropagation(); showTip(e); });
                 el.addEventListener('mouseleave', () => { tooltipEl.style.display = 'none'; });
             });
         }
+        document.addEventListener('pointerdown', (e) => {
+            if (tooltipEl.style.display === 'block' && !e.target.closest('.vocab-term') && !tooltipEl.contains(e.target)) {
+                tooltipEl.style.display = 'none';
+            }
+        });
+        window.addEventListener('scroll', () => {
+            if (tooltipEl.style.display === 'block') tooltipEl.style.display = 'none';
+        }, { passive: true });
 
         function v(word) {
             return `<span class="vocab-term" data-term="${word}">${word}</span>`;

@@ -261,3 +261,39 @@
             applyLanguage(currentLang === 'zh' ? 'en' : 'zh');
         });
 
+        // Mobile iOS-Style Bottom Dock Quick-Jump & Active Highlight
+        (function initMobileDock() {
+            const dock = document.getElementById('mobileDock');
+            if (!dock) return;
+            const btns = Array.from(dock.querySelectorAll('.dock-btn'));
+            btns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const target = document.getElementById(btn.dataset.target);
+                    if (!target) return;
+                    btns.forEach(b => b.classList.toggle('active', b === btn));
+                    const navH = document.querySelector('.apple-nav')?.offsetHeight || 56;
+                    const y = target.getBoundingClientRect().top + window.scrollY - navH - 10;
+                    window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
+                });
+            });
+
+            if (typeof IntersectionObserver !== 'undefined') {
+                const sections = btns
+                    .map(b => ({ btn: b, el: document.getElementById(b.dataset.target) }))
+                    .filter(x => x.el);
+                const obs = new IntersectionObserver((entries) => {
+                    let best = null;
+                    for (const entry of entries) {
+                        if (entry.isIntersecting && (!best || entry.intersectionRatio > best.intersectionRatio)) {
+                            best = entry;
+                        }
+                    }
+                    if (best) {
+                        const match = sections.find(s => s.el === best.target);
+                        if (match) btns.forEach(b => b.classList.toggle('active', b === match.btn));
+                    }
+                }, { rootMargin: '-20% 0px -55% 0px', threshold: [0.1, 0.4, 0.7] });
+                sections.forEach(s => obs.observe(s.el));
+            }
+        })();
+

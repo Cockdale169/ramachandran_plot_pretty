@@ -313,6 +313,15 @@ let aaPickerFilter = 'all';
     const gridScroll = document.getElementById('aaGridScroll');
 
     function positionPopover() {
+        if (window.innerWidth <= 680) {
+            popover.style.left = '';
+            popover.style.right = '';
+            popover.style.top = '';
+            popover.style.bottom = '';
+            popover.style.width = '';
+            gridScroll.style.maxHeight = '';
+            return;
+        }
         const rect = trigger.getBoundingClientRect();
         const pad = 12;
         const spaceBelow = window.innerHeight - rect.bottom - pad;
