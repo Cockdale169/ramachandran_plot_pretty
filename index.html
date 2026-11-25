@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Ramachandran Plot — 3D 結構生物學自學實驗室</title>
     <link rel="stylesheet" href="css/style.css">
     <script type="importmap">
@@ -66,7 +66,7 @@
 
     <div class="wrapper">
         <!-- 十步驟漸進式互動導覽器 -->
-        <section class="wizard-card">
+        <section class="wizard-card" id="secWizard">
             <div class="wizard-top">
                 <div class="step-pills" id="stepPillsContainer"></div>
                 <div class="wizard-nav">
@@ -88,7 +88,7 @@
         <!-- 三欄主工作區 -->
         <main class="workspace-grid">
             <!-- 左欄：3D 互動分子模型 -->
-            <section class="card">
+            <section class="card" id="sec3D">
                 <div class="card-title-row">
                     <div class="card-title-group">
                         <span class="card-step-num">1</span>
@@ -153,7 +153,7 @@
             </section>
 
             <!-- 中欄：4K 高清拉氏圖 + 狀態判定區塊 -->
-            <section class="card">
+            <section class="card" id="secRama">
                 <div class="card-title-row">
                     <div class="card-title-group">
                         <span class="card-step-num">2</span>
@@ -186,7 +186,7 @@
             </section>
 
             <!-- 右欄：三角度控制盤、凡得瓦半徑與結構預設 -->
-            <section class="control-col">
+            <section class="control-col" id="secControls">
                 <div class="card">
                     <div class="card-title-row">
                         <div class="card-title-group">
@@ -267,7 +267,7 @@
                 </div>
 
                 <!-- P2: 真實 PDB 檔案拖曳解析卡片 -->
-                <div class="card">
+                <div class="card" id="secPDB">
                     <div class="card-title-row">
                         <div class="card-title-group">
                             <span class="card-step-num">5</span>
@@ -310,6 +310,15 @@
         <span>Studio PBR WebGL · NeRF Backbone Physics · Client-Side PDB Analyzer</span>
     </footer>
     <div id="appleToast" role="status" aria-live="polite"></div>
+
+    <!-- Mobile iOS-Style Floating Bottom Dock (visible <= 860px) -->
+    <nav class="mobile-dock" id="mobileDock" aria-label="手機快速導覽">
+        <button type="button" class="dock-btn active" data-target="secWizard"><span>📖</span><small>導覽</small></button>
+        <button type="button" class="dock-btn" data-target="sec3D"><span>🧊</span><small>3D模型</small></button>
+        <button type="button" class="dock-btn" data-target="secRama"><span>📊</span><small>拉氏圖</small></button>
+        <button type="button" class="dock-btn" data-target="secControls"><span>🎛️</span><small>控制</small></button>
+        <button type="button" class="dock-btn" data-target="secPDB"><span>🧬</span><small>PDB</small></button>
+    </nav>
 
     <script src="js/00-amino-acids.js"></script>
     <script src="js/01-vocab-steps.js"></script>
