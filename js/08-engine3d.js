@@ -10,7 +10,7 @@
                 const THREE = await import('three');
                 const isMobilePerf = (window.matchMedia && window.matchMedia('(pointer: coarse)').matches)
                     || Math.min(window.innerWidth, window.innerHeight) <= 680;
-                const targetDPR = Math.min(window.devicePixelRatio || 1, isMobilePerf ? 1.35 : 2);
+                const targetDPR = isMobilePerf ? 1 : Math.min(window.devicePixelRatio || 1, 2);
 
                 const scene = new THREE.Scene();
                 const width = threeContainer.clientWidth || 560;
@@ -18,25 +18,33 @@
                 const camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 320);
                 camera.position.set(0, 2.8, 9.6);
 
-                const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+                const renderer = new THREE.WebGLRenderer({
+                    antialias: true,
+                    alpha: true,
+                    powerPreference: isMobilePerf ? 'default' : 'high-performance'
+                });
                 renderer.setSize(width, height);
                 renderer.setPixelRatio(targetDPR);
-                renderer.toneMapping = THREE.ACESFilmicToneMapping;
-                renderer.toneMappingExposure = 1.15;
+                if (!isMobilePerf) {
+                    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+                    renderer.toneMappingExposure = 1.15;
+                }
                 if (isMobilePerf) renderer.domElement.style.touchAction = 'none';
                 threeContainer.appendChild(renderer.domElement);
 
-                // Studio Environment Reflection (Apple Hardware Keynote look)
-                try {
-                    const { RoomEnvironment } = await import('three/addons/environments/RoomEnvironment.js');
-                    const pmremGenerator = new THREE.PMREMGenerator(renderer);
-                    const envScene = new RoomEnvironment();
-                    const envTexture = pmremGenerator.fromScene(envScene, 0.04).texture;
-                    scene.environment = envTexture;
-                    envScene.dispose();
-                    pmremGenerator.dispose();
-                } catch (_) {
-                    // Fallback gracefully if RoomEnvironment unavailable
+                // Studio Environment Reflection (Desktop only; mobile uses lightweight Phong + 3-point studio lights for 60fps)
+                if (!isMobilePerf) {
+                    try {
+                        const { RoomEnvironment } = await import('three/addons/environments/RoomEnvironment.js');
+                        const pmremGenerator = new THREE.PMREMGenerator(renderer);
+                        const envScene = new RoomEnvironment();
+                        const envTexture = pmremGenerator.fromScene(envScene, 0.04).texture;
+                        scene.environment = envTexture;
+                        envScene.dispose();
+                        pmremGenerator.dispose();
+                    } catch (_) {
+                        // Fallback gracefully if RoomEnvironment unavailable
+                    }
                 }
 
                 // Controls: Desktop uses unrestricted 360° TrackballControls; Mobile uses smooth touch-native OrbitControls
@@ -110,11 +118,20 @@
                 rimLight.position.set(0, -6, -10);
                 scene.add(rimLight);
 
-                // Ceramic / Anodized Metal Apple PBR Materials (auto-uses lighter MeshStandardMaterial on mobile GPUs)
+                // Ceramic / Anodized Metal Apple PBR Materials (auto-uses fast MeshPhongMaterial on mobile GPUs)
                 function makePBRMat(opts) {
                     if (isMobilePerf) {
-                        const { clearcoat, clearcoatRoughness, ...stdOpts } = opts;
-                        return new THREE.MeshStandardMaterial(stdOpts);
+                        const phongOpts = {
+                            color: opts.color,
+                            shininess: opts.roughness !== undefined ? Math.round((1 - opts.roughness) * 110) : 80,
+                            specular: new THREE.Color(0x555566)
+                        };
+                        if (opts.transparent) phongOpts.transparent = true;
+                        if (opts.opacity !== undefined) phongOpts.opacity = opts.opacity;
+                        if (opts.side !== undefined) phongOpts.side = opts.side;
+                        if (opts.depthWrite !== undefined) phongOpts.depthWrite = opts.depthWrite;
+                        if (opts.emissive !== undefined) phongOpts.emissive = opts.emissive;
+                        return new THREE.MeshPhongMaterial(phongOpts);
                     }
                     return new THREE.MeshPhysicalMaterial(opts);
                 }
@@ -1259,6 +1276,8 @@
                     if (!document.hidden) requestRender(true);
                 });
 
+                let lastLabelUpdateTime = 0;
+
                 function animate() {
                     renderRequested = false;
                     if (document.hidden) return;
@@ -1314,8 +1333,12 @@
                         needsRender = false;
                     }
                     if (needsLabelUpdate) {
-                        updateSmartLabels();
-                        needsLabelUpdate = false;
+                        const now = performance.now();
+                        if (!isMobilePerf || !stillMoving || (now - lastLabelUpdateTime >= 55)) {
+                            updateSmartLabels();
+                            lastLabelUpdateTime = now;
+                            needsLabelUpdate = false;
+                        }
                     }
 
                     if (stillMoving) {
