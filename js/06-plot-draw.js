@@ -144,12 +144,15 @@
 
             // P2: If PDB is loaded, render all parsed residues as interactive scatter dots
             if (pdbData && pdbData.residues.length > 0) {
+                const isDensePDB = pdbData.residues.length > 80;
                 pdbData.residues.forEach((r, idx) => {
                     if (r.phi === null || r.psi === null) return;
                     const rx = toX(r.phi);
                     const ry = toY(r.psi);
                     const isSel = idx === pdbData.selectedIdx;
-                    const color = r.status === 'favored' ? '#34c759' : (r.status === 'allowed' ? '#ff9500' : '#ff3b30');
+                    const color = r.status === 'favored'
+                        ? (isDensePDB ? 'rgba(52, 199, 89, 0.72)' : '#34c759')
+                        : (r.status === 'allowed' ? '#ff9500' : '#ff3b30');
 
                     if (isSel) {
                         rCtx.beginPath();
@@ -162,11 +165,12 @@
                     }
 
                     rCtx.beginPath();
-                    rCtx.arc(rx, ry, isSel ? 5.5 : (r.status === 'outlier' ? 4.8 : 4.0), 0, Math.PI * 2);
+                    const dotR = isSel ? 5.5 : (r.status === 'outlier' ? 4.8 : (isDensePDB ? 3.0 : 4.0));
+                    rCtx.arc(rx, ry, dotR, 0, Math.PI * 2);
                     rCtx.fillStyle = color;
                     rCtx.fill();
                     rCtx.strokeStyle = '#ffffff';
-                    rCtx.lineWidth = isSel ? 2 : 1.3;
+                    rCtx.lineWidth = isSel ? 2 : (isDensePDB ? 0.9 : 1.3);
                     rCtx.stroke();
                 });
 

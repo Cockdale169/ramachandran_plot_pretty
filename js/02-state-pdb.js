@@ -70,6 +70,7 @@
         let clearPDB3DFn = null;
         let buildDemoPDBTextFn = null;
         let refreshLabelsLang3DFn = null;
+        let updatePDB3DGeometryFn = null;
 
         // P2: PDB State
         let pdbData = null; // { name, residues: [{ chain, resSeq, resName, aaClass, phi, psi, omega, status, ca, n, c, o }], selectedIdx }
@@ -274,6 +275,86 @@
 
             drawRamachandranPlot(currentPhi, currentPsi, currentAA);
             if (selectPDBResidue3DFn) selectPDBResidue3DFn(idx, focusCam);
+        }
+
+        function rotatePointAxis(p, origin, ux, uy, uz, rad) {
+            const x = p.x - origin.x, y = p.y - origin.y, z = p.z - origin.z;
+            const c = Math.cos(rad), s = Math.sin(rad), t = 1 - c;
+            const dot = ux * x + uy * y + uz * z;
+            const cx = uy * z - uz * y;
+            const cy = uz * x - ux * z;
+            const cz = ux * y - uy * x;
+            p.x = origin.x + x * c + cx * s + ux * dot * t;
+            p.y = origin.y + y * c + cy * s + uy * dot * t;
+            p.z = origin.z + z * c + cz * s + uz * dot * t;
+        }
+
+        function updateSelectedPDBAngles(newPhi, newPsi) {
+            if (!pdbData || pdbData.selectedIdx < 0) return false;
+            const idx = pdbData.selectedIdx;
+            const r = pdbData.residues[idx];
+            if (!r) return false;
+
+            const dPhi = (r.phi !== null) ? wrapDiff(newPhi, r.phi) : 0;
+            const dPsi = (r.psi !== null) ? wrapDiff(newPsi, r.psi) : 0;
+
+            if (dPhi !== 0 && r.n && r.ca) {
+                const dx = r.ca.x - r.n.x, dy = r.ca.y - r.n.y, dz = r.ca.z - r.n.z;
+                const len = Math.hypot(dx, dy, dz);
+                if (len > 1e-5) {
+                    const ux = dx / len, uy = dy / len, uz = dz / len;
+                    const rad = (dPhi * Math.PI) / 180;
+                    if (r.c) rotatePointAxis(r.c, r.ca, ux, uy, uz, rad);
+                    if (r.o) rotatePointAxis(r.o, r.ca, ux, uy, uz, rad);
+                    for (let j = idx + 1; j < pdbData.residues.length; j++) {
+                        const dj = pdbData.residues[j];
+                        if (dj.n) rotatePointAxis(dj.n, r.ca, ux, uy, uz, rad);
+                        if (dj.ca) rotatePointAxis(dj.ca, r.ca, ux, uy, uz, rad);
+                        if (dj.c) rotatePointAxis(dj.c, r.ca, ux, uy, uz, rad);
+                        if (dj.o) rotatePointAxis(dj.o, r.ca, ux, uy, uz, rad);
+                    }
+                    r.phi = newPhi;
+                }
+            }
+
+            if (dPsi !== 0 && r.ca && r.c) {
+                const dx = r.c.x - r.ca.x, dy = r.c.y - r.ca.y, dz = r.c.z - r.ca.z;
+                const len = Math.hypot(dx, dy, dz);
+                if (len > 1e-5) {
+                    const ux = dx / len, uy = dy / len, uz = dz / len;
+                    const rad = (dPsi * Math.PI) / 180;
+                    if (r.o) rotatePointAxis(r.o, r.c, ux, uy, uz, rad);
+                    for (let j = idx + 1; j < pdbData.residues.length; j++) {
+                        const dj = pdbData.residues[j];
+                        if (dj.n) rotatePointAxis(dj.n, r.c, ux, uy, uz, rad);
+                        if (dj.ca) rotatePointAxis(dj.ca, r.c, ux, uy, uz, rad);
+                        if (dj.c) rotatePointAxis(dj.c, r.c, ux, uy, uz, rad);
+                        if (dj.o) rotatePointAxis(dj.o, r.c, ux, uy, uz, rad);
+                    }
+                    r.psi = newPsi;
+                }
+            }
+
+            if (r.phi !== null && r.psi !== null) {
+                const density = computeDensity(r.phi, r.psi, r.aaClass);
+                const tFav = getFavoredThreshold(r.aaClass);
+                r.status = density >= tFav ? 'favored' : (density >= 0.11 ? 'allowed' : 'outlier');
+            }
+
+            const scored = pdbData.residues.filter(x => x.phi !== null && x.psi !== null);
+            const favCnt = scored.filter(x => x.status === 'favored').length;
+            const allCnt = scored.filter(x => x.status === 'allowed').length;
+            const outCnt = scored.filter(x => x.status === 'outlier').length;
+            const denom = Math.max(1, scored.length);
+            pdbFavPctEl.textContent = `${Math.round((favCnt / denom) * 100)}%`;
+            pdbAllPctEl.textContent = `${Math.round((allCnt / denom) * 100)}%`;
+            pdbOutCntEl.textContent = `${outCnt}`;
+            distanceHud.className = outCnt > 0 ? 'distance-hud danger' : 'distance-hud';
+            distanceHud.textContent = `🧬 PDB: ${pdbData.name} · ${pdbData.residues.length} aa · ${outCnt} Outliers`;
+
+            if (updatePDB3DGeometryFn) updatePDB3DGeometryFn(pdbData);
+            selectPDBResidue(idx, false);
+            return true;
         }
 
         function loadPDBContent(text, fileName, preferredChain = null) {

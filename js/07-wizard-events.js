@@ -269,6 +269,11 @@
             omegaVal.textContent = `${currentOmega}°`;
             updateSliderFills();
 
+            if (pdbData && pdbData.selectedIdx >= 0) {
+                updateSelectedPDBAngles(currentPhi, currentPsi);
+                return;
+            }
+
             if (viewMode === 'chain') {
                 updateChainHintText();
             }
@@ -405,4 +410,6 @@
             toggleLabelsBtn.classList.toggle('active', showLabels3D);
             if (setLabels3DFn) setLabels3DFn(showLabels3D);
         });
+
+        applyLanguage(currentLang);
 

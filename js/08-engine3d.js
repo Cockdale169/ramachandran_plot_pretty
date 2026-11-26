@@ -10,7 +10,7 @@
                 const THREE = await import('three');
                 const isMobilePerf = (window.matchMedia && window.matchMedia('(pointer: coarse)').matches)
                     || Math.min(window.innerWidth, window.innerHeight) <= 680;
-                const targetDPR = isMobilePerf ? 1 : Math.min(window.devicePixelRatio || 1, 2);
+                const targetDPR = isMobilePerf ? 1 : Math.min(window.devicePixelRatio || 1, 1.5);
 
                 const scene = new THREE.Scene();
                 const width = threeContainer.clientWidth || 560;
@@ -62,11 +62,11 @@
                 } else {
                     const { TrackballControls } = await import('three/addons/controls/TrackballControls.js');
                     controls = new TrackballControls(camera, renderer.domElement);
-                    controls.rotateSpeed = 2.8;
-                    controls.zoomSpeed = 1.45;
-                    controls.panSpeed = 0.85;
+                    controls.rotateSpeed = 1.15;
+                    controls.zoomSpeed = 1.0;
+                    controls.panSpeed = 0.75;
                     controls.staticMoving = false;
-                    controls.dynamicDampingFactor = 0.14;
+                    controls.dynamicDampingFactor = 0.28;
                     controls.minDistance = 1.2;
                     controls.maxDistance = 140;
                 }
@@ -155,11 +155,11 @@
                 }));
                 const matHBondDashed = new THREE.LineDashedMaterial({ color: 0xbf5af2, dashSize: 0.17, gapSize: 0.11 });
 
-                // Cached unit geometries (adaptive detail for smooth 60fps on mobile GPUs)
-                const unitSphereGeo = new THREE.SphereGeometry(1, isMobilePerf ? 20 : 36, isMobilePerf ? 14 : 28);
-                const unitCylGeo = new THREE.CylinderGeometry(1, 1, 1, isMobilePerf ? 10 : 18);
-                const chainSphereGeo = new THREE.SphereGeometry(1, isMobilePerf ? 12 : 22, isMobilePerf ? 10 : 16);
-                const chainCylGeo = new THREE.CylinderGeometry(1, 1, 1, isMobilePerf ? 8 : 12);
+                // Cached unit geometries (adaptive detail for smooth 60fps on both desktop & mobile)
+                const unitSphereGeo = new THREE.SphereGeometry(1, isMobilePerf ? 18 : 24, isMobilePerf ? 14 : 18);
+                const unitCylGeo = new THREE.CylinderGeometry(1, 1, 1, isMobilePerf ? 10 : 14);
+                const chainSphereGeo = new THREE.SphereGeometry(1, isMobilePerf ? 12 : 18, isMobilePerf ? 10 : 14);
+                const chainCylGeo = new THREE.CylinderGeometry(1, 1, 1, isMobilePerf ? 8 : 10);
 
                 function createSphere(radius, material, pos) {
                     const mesh = new THREE.Mesh(unitSphereGeo, material);
@@ -974,9 +974,9 @@
                 let pdbRadius = 14;
                 let currentPDBParsed = null;
 
-                renderPDB3DFn = (parsed) => {
+                renderPDB3DFn = (parsed, keepCamera = false) => {
                     currentPDBParsed = parsed;
-                    clearLabelsByTag('pdb');
+                    if (!keepCamera) clearLabelsByTag('pdb');
                     clearGroupResources(pdbGroup);
 
                     const favPts = [], allPts = [], outPts = [], termPts = [];
@@ -1000,14 +1000,17 @@
 
                     if (caVecs.length >= 2) {
                         const curve = new THREE.CatmullRomCurve3(caVecs);
-                        pdbGroup.add(new THREE.Mesh(new THREE.TubeGeometry(curve, Math.min(240, caVecs.length * 6), 0.22, 12, false), matPDBRibbon));
+                        const tubeSegs = Math.min(isMobilePerf ? 140 : 220, caVecs.length * 4);
+                        const radSegs = isMobilePerf ? 7 : 10;
+                        pdbGroup.add(new THREE.Mesh(new THREE.TubeGeometry(curve, tubeSegs, 0.17, radSegs, false), matPDBRibbon));
                     }
 
-                    addInstancedSpheres(pdbGroup, favPts, 0.34, matPDBFavored);
-                    addInstancedSpheres(pdbGroup, allPts, 0.36, matPDBAllowed);
+                    const dense = caVecs.length > 120;
+                    addInstancedSpheres(pdbGroup, favPts, dense ? 0.20 : 0.32, matPDBFavored);
+                    addInstancedSpheres(pdbGroup, allPts, dense ? 0.28 : 0.36, matPDBAllowed);
                     addInstancedSpheres(pdbGroup, outPts, 0.44, matPDBOutlier);
-                    addInstancedSpheres(pdbGroup, termPts, 0.32, matPDBTerm);
-                    addInstancedBonds(pdbGroup, bonds, 0.11, matBond);
+                    addInstancedSpheres(pdbGroup, termPts, dense ? 0.22 : 0.30, matPDBTerm);
+                    if (!dense) addInstancedBonds(pdbGroup, bonds, 0.09, matBond);
 
                     pdbSelectHalo = createSphere(0.75, matPDBHighlight, new THREE.Vector3());
                     pdbSelectHalo.visible = false;
@@ -1018,24 +1021,47 @@
                     chainGroup.visible = false;
                     pdbGroup.visible = true;
 
-                    const fovRad = THREE.MathUtils.degToRad(camera.fov * 0.5);
-                    const fitDist = Math.max(16, Math.min(110, (pdbRadius / Math.sin(fovRad)) * 1.05));
-                    animateCameraTo(new THREE.Vector3(0, fitDist * 0.15, fitDist), new THREE.Vector3(0, 0, 0), 520, true);
+                    if (!keepCamera) {
+                        const fovRad = THREE.MathUtils.degToRad(camera.fov * 0.5);
+                        const fitDist = Math.max(16, Math.min(110, (pdbRadius / Math.sin(fovRad)) * 1.05));
+                        animateCameraTo(new THREE.Vector3(0, fitDist * 0.15, fitDist), new THREE.Vector3(0, 0, 0), 520, true);
+                    } else {
+                        requestRender(true);
+                    }
                 };
+
+                updatePDB3DGeometryFn = (parsed) => {
+                    renderPDB3DFn(parsed, true);
+                };
+
+                let pdbPulseUntil = 0;
 
                 selectPDBResidue3DFn = (idx, focusCam = false) => {
                     if (!currentPDBParsed || !pdbSelectHalo) return;
-                    clearLabelsByTag('pdb');
                     const r = currentPDBParsed.residues[idx];
                     if (!r) return;
                     const pos = new THREE.Vector3(r.ca.x, r.ca.y, r.ca.z);
                     pdbSelectHalo.position.copy(pos);
+                    pdbSelectHalo.scale.setScalar(0.76);
                     pdbSelectHalo.visible = true;
+                    pdbPulseUntil = performance.now() + 1200;
                     const dotColor = r.status === 'favored' ? '#34c759' : (r.status === 'allowed' ? '#ff9f0a' : '#ff3b30');
                     const lblText = r.phi !== null && r.psi !== null
                         ? `${r.resName} ${r.resSeq} (${r.phi}°, ${r.psi}°)`
                         : `${r.resName} ${r.resSeq}`;
-                    registerLabel(lblText, dotColor, pdbSelectHalo, new THREE.Vector3(0, 0, 0), 'pdb');
+                    const existing = activeLabels.find(l => l.groupTag === 'pdb');
+                    if (existing) {
+                        existing.object3D = pdbSelectHalo;
+                        existing.text = lblText;
+                        existing.dotColor = dotColor;
+                        existing.w = 0;
+                        const dotEl = existing.el.querySelector('.atom-tag-dot');
+                        const txtEl = existing.el.querySelector('span:last-child');
+                        if (dotEl) dotEl.style.background = dotColor;
+                        if (txtEl) txtEl.textContent = lblText;
+                    } else {
+                        registerLabel(lblText, dotColor, pdbSelectHalo, new THREE.Vector3(0, 0, 0), 'pdb');
+                    }
                     if (focusCam) {
                         const camDir = camera.position.clone().sub(controls.target).normalize();
                         if (camDir.lengthSq() < 0.01) camDir.set(0, 0.2, 1).normalize();
@@ -1277,6 +1303,7 @@
                 });
 
                 let lastLabelUpdateTime = 0;
+                let lastPulseTime = 0;
 
                 function animate() {
                     renderRequested = false;
@@ -1312,19 +1339,24 @@
                         stillMoving = true;
                     }
 
-                    const pulsing = clashSphere1.visible || (pdbSelectHalo && pdbSelectHalo.visible);
+                    const pdbPulsing = pdbSelectHalo && pdbSelectHalo.visible && performance.now() < pdbPulseUntil;
+                    const pulsing = clashSphere1.visible || pdbPulsing;
                     if (pulsing) {
-                        const elapsed = clock.getElapsedTime();
-                        if (clashSphere1.visible) {
-                            const pulse = 0.68 * (1 + Math.sin(elapsed * 8) * 0.16);
-                            clashSphere1.scale.setScalar(pulse);
-                            clashSphere2.scale.setScalar(pulse);
+                        const now = performance.now();
+                        if (now - lastPulseTime >= 66) {
+                            lastPulseTime = now;
+                            const elapsed = clock.getElapsedTime();
+                            if (clashSphere1.visible) {
+                                const pulse = 0.68 * (1 + Math.sin(elapsed * 8) * 0.16);
+                                clashSphere1.scale.setScalar(pulse);
+                                clashSphere2.scale.setScalar(pulse);
+                            }
+                            if (pdbPulsing) {
+                                const p = 0.72 * (1 + Math.sin(elapsed * 6) * 0.18);
+                                pdbSelectHalo.scale.setScalar(p);
+                            }
+                            needsRender = true;
                         }
-                        if (pdbSelectHalo && pdbSelectHalo.visible) {
-                            const p = 0.72 * (1 + Math.sin(elapsed * 6) * 0.18);
-                            pdbSelectHalo.scale.setScalar(p);
-                        }
-                        needsRender = true;
                         stillMoving = true;
                     }
 

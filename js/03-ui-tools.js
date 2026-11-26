@@ -39,6 +39,7 @@
             omegaSlider.style.background = `linear-gradient(90deg, ${omColor} 0%, ${omColor} ${omPct}%, ${trackBg} ${omPct}%, ${trackBg} 100%)`;
         }
 
+        let syncStarfieldState = null;
         function applyTheme(dark, silent = false) {
             document.body.classList.toggle('theme-dark', dark);
             themeToggleBtn.textContent = isEN()
@@ -47,17 +48,22 @@
             themeToggleBtn.classList.toggle('active', dark);
             try { localStorage.setItem('rama-theme', dark ? 'dark' : 'light'); } catch (_) {}
             updateSliderFills();
-            drawRamachandranPlot(currentPhi, currentPsi, currentAA);
+            if (typeof drawRamachandranPlot === 'function') drawRamachandranPlot(currentPhi, currentPsi, currentAA);
             if (!silent) showAppleToast(isEN()
                 ? (dark ? '🌙 Switched to Pro Titanium Dark' : '☀️ Switched to Studio Light')
                 : (dark ? '🌙 已切換至 Pro 深色鈦金主題' : '☀️ 已切換至 Studio 淺色主題'));
+            if (typeof syncStarfieldState === 'function') syncStarfieldState();
         }
         themeToggleBtn.addEventListener('click', () => {
             applyTheme(!document.body.classList.contains('theme-dark'));
         });
         try {
-            if (localStorage.getItem('rama-theme') === 'dark') applyTheme(true, true);
-        } catch (_) {}
+            const savedTheme = localStorage.getItem('rama-theme');
+            if (savedTheme === 'light') applyTheme(false, true);
+            else applyTheme(true, true);
+        } catch (_) {
+            applyTheme(true, true);
+        }
 
         function buildShareURL() {
             const params = new URLSearchParams();
@@ -347,12 +353,8 @@
             document.querySelector('.hero-title').innerHTML = t.heroTitle;
             document.querySelector('.hero-subtitle').textContent = t.heroSub;
 
-            document.querySelectorAll('.hero-specs .spec-chip').forEach((chip, i) => {
-                if (!t.specs[i]) return;
-                const dot = chip.querySelector('i');
-                chip.innerHTML = '';
-                if (dot) chip.appendChild(dot);
-                chip.appendChild(document.createTextNode(t.specs[i]));
+            document.querySelectorAll('.hero-specs .bento-val').forEach((el, i) => {
+                if (t.specs[i]) el.textContent = t.specs[i];
             });
 
             document.querySelectorAll('.workspace-grid .card .card-title-row h2').forEach((h2, i) => {
@@ -486,5 +488,231 @@
                 }, { rootMargin: '-20% 0px -55% 0px', threshold: [0.1, 0.4, 0.7] });
                 sections.forEach(s => obs.observe(s.el));
             }
+        })();
+
+        // ==========================================
+        // Realistic Astronomical Night Sky & Milky Way Renderer (Dark Mode)
+        // ==========================================
+        (function initRealisticStarfield() {
+            const canvas = document.getElementById('starfieldCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d', { alpha: false });
+            let bgBuffer = null;
+            let twinkleStars = [];
+            let timerId = null;
+
+            // Deterministic PRNG for consistent organic star distribution
+            let seed = 42197;
+            function rand() {
+                seed = (seed * 1664525 + 1013904223) >>> 0;
+                return seed / 4294967296;
+            }
+            function gauss() {
+                return (rand() + rand() + rand() - 1.5) * 0.82;
+            }
+
+            // Real stellar blackbody colors (O, B, A, F, G, K, M spectral types)
+            const STAR_COLORS = [
+                [175, 208, 255], // O/B blue-white
+                [210, 228, 255], // A blue-white
+                [255, 255, 255], // F crisp white
+                [255, 255, 255], // F/G white
+                [255, 244, 218], // G warm white
+                [255, 218, 168], // K golden-orange
+                [255, 188, 148]  // M soft amber-red
+            ];
+
+            function buildSky() {
+                const w = window.innerWidth || 1280;
+                const h = window.innerHeight || 800;
+                canvas.width = w;
+                canvas.height = h;
+
+                if (!bgBuffer) bgBuffer = document.createElement('canvas');
+                bgBuffer.width = w;
+                bgBuffer.height = h;
+                const bCtx = bgBuffer.getContext('2d', { alpha: false });
+
+                seed = 42197;
+                twinkleStars = [];
+
+                // 1. Deep realistic night-sky zenith-to-horizon gradient
+                const skyGrad = bCtx.createLinearGradient(0, 0, 0, h);
+                skyGrad.addColorStop(0, '#02040a');
+                skyGrad.addColorStop(0.55, '#050915');
+                skyGrad.addColorStop(1, '#091122');
+                bCtx.fillStyle = skyGrad;
+                bCtx.fillRect(0, 0, w, h);
+
+                // 2. Diagonal Milky Way galactic band (soft layered nebula clouds + faint warm core)
+                bCtx.save();
+                bCtx.translate(w * 0.52, h * 0.48);
+                bCtx.rotate(-0.46);
+                const bandLen = Math.hypot(w, h) * 1.15;
+
+                // Broad outer galactic glow
+                const mwOuter = bCtx.createRadialGradient(0, 0, bandLen * 0.02, 0, 0, bandLen * 0.55);
+                mwOuter.addColorStop(0, 'rgba(130, 160, 225, 0.14)');
+                mwOuter.addColorStop(0.35, 'rgba(95, 118, 195, 0.085)');
+                mwOuter.addColorStop(0.7, 'rgba(55, 70, 140, 0.03)');
+                mwOuter.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                bCtx.save();
+                bCtx.scale(1, 0.28);
+                bCtx.fillStyle = mwOuter;
+                bCtx.fillRect(-bandLen, -bandLen, bandLen * 2, bandLen * 2);
+                bCtx.restore();
+
+                // Warm galactic core + subtle magenta/cyan emission nebulae patches
+                const clouds = [
+                    { x: -bandLen * 0.12, y: 0, rx: bandLen * 0.22, ry: bandLen * 0.065, c: 'rgba(215, 185, 155, 0.085)' },
+                    { x: bandLen * 0.14, y: -12, rx: bandLen * 0.20, ry: bandLen * 0.06, c: 'rgba(110, 175, 255, 0.08)' },
+                    { x: -bandLen * 0.28, y: 14, rx: bandLen * 0.16, ry: bandLen * 0.055, c: 'rgba(180, 115, 235, 0.065)' },
+                    { x: bandLen * 0.02, y: 18, rx: bandLen * 0.18, ry: bandLen * 0.05, c: 'rgba(255, 140, 175, 0.045)' }
+                ];
+                clouds.forEach(cl => {
+                    bCtx.save();
+                    bCtx.translate(cl.x, cl.y);
+                    bCtx.scale(1, cl.ry / cl.rx);
+                    const g = bCtx.createRadialGradient(0, 0, 0, 0, 0, cl.rx);
+                    g.addColorStop(0, cl.c);
+                    g.addColorStop(1, 'rgba(0,0,0,0)');
+                    bCtx.fillStyle = g;
+                    bCtx.beginPath();
+                    bCtx.arc(0, 0, cl.rx, 0, Math.PI * 2);
+                    bCtx.fill();
+                    bCtx.restore();
+                });
+
+                // Subtle dark cosmic dust rift along the center of the Milky Way
+                const rift = bCtx.createRadialGradient(0, 4, 0, 0, 4, bandLen * 0.36);
+                rift.addColorStop(0, 'rgba(2, 4, 10, 0.42)');
+                rift.addColorStop(0.6, 'rgba(2, 4, 10, 0.16)');
+                rift.addColorStop(1, 'rgba(2, 4, 10, 0)');
+                bCtx.save();
+                bCtx.scale(1, 0.06);
+                bCtx.fillStyle = rift;
+                bCtx.fillRect(-bandLen, -bandLen, bandLen * 2, bandLen * 2);
+                bCtx.restore();
+                bCtx.restore();
+
+                // 3. Dense faint star dust concentrated along the Milky Way plane + uniform field stars
+                const areaFactor = Math.min(1.3, (w * h) / (1280 * 800));
+                const dustCount = Math.round(420 * areaFactor);
+                const fieldCount = Math.round(240 * areaFactor);
+                const cosA = Math.cos(-0.46), sinA = Math.sin(-0.46);
+
+                for (let i = 0; i < dustCount; i++) {
+                    const along = (rand() - 0.5) * bandLen;
+                    const across = gauss() * Math.min(w, h) * 0.19;
+                    const x = w * 0.52 + along * cosA - across * sinA;
+                    const y = h * 0.48 + along * sinA + across * cosA;
+                    if (x < 0 || x > w || y < 0 || y > h) continue;
+                    const col = STAR_COLORS[Math.floor(rand() * STAR_COLORS.length)];
+                    const r = 0.35 + Math.pow(rand(), 3) * 1.1;
+                    const a = 0.18 + Math.pow(rand(), 2) * 0.65;
+                    bCtx.fillStyle = `rgba(${col[0]},${col[1]},${col[2]},${a.toFixed(2)})`;
+                    bCtx.beginPath();
+                    bCtx.arc(x, y, r, 0, Math.PI * 2);
+                    bCtx.fill();
+                }
+
+                for (let i = 0; i < fieldCount; i++) {
+                    const x = rand() * w;
+                    const y = rand() * h;
+                    const col = STAR_COLORS[Math.floor(rand() * STAR_COLORS.length)];
+                    const r = 0.4 + Math.pow(rand(), 3.2) * 1.25;
+                    const a = 0.25 + rand() * 0.65;
+                    bCtx.fillStyle = `rgba(${col[0]},${col[1]},${col[2]},${a.toFixed(2)})`;
+                    bCtx.beginPath();
+                    bCtx.arc(x, y, r, 0, Math.PI * 2);
+                    bCtx.fill();
+                }
+
+                // 4. Select ~38 bright stars for realistic gentle scintillation (twinkling)
+                const brightCount = Math.round(36 * areaFactor);
+                for (let i = 0; i < brightCount; i++) {
+                    const col = STAR_COLORS[Math.floor(rand() * STAR_COLORS.length)];
+                    const isHero = i < 7;
+                    twinkleStars.push({
+                        x: rand() * w,
+                        y: rand() * h,
+                        r: isHero ? (1.45 + rand() * 0.65) : (0.9 + rand() * 0.6),
+                        col,
+                        phase: rand() * Math.PI * 2,
+                        speed: 0.9 + rand() * 1.8,
+                        hero: isHero
+                    });
+                }
+
+                drawFrame(0);
+            }
+
+            function drawFrame(tSec) {
+                if (!bgBuffer) return;
+                ctx.drawImage(bgBuffer, 0, 0);
+                for (let i = 0; i < twinkleStars.length; i++) {
+                    const s = twinkleStars[i];
+                    const tw = 0.58 + 0.42 * Math.sin(tSec * s.speed + s.phase);
+                    const [cr, cg, cb] = s.col;
+
+                    // Soft atmospheric halo
+                    const haloR = s.r * (s.hero ? 5.2 : 3.2);
+                    const g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, haloR);
+                    g.addColorStop(0, `rgba(${cr},${cg},${cb},${(0.85 * tw).toFixed(2)})`);
+                    g.addColorStop(0.35, `rgba(${cr},${cg},${cb},${(0.24 * tw).toFixed(2)})`);
+                    g.addColorStop(1, 'rgba(0,0,0,0)');
+                    ctx.fillStyle = g;
+                    ctx.beginPath();
+                    ctx.arc(s.x, s.y, haloR, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Crisp star core
+                    ctx.fillStyle = `rgba(255,255,255,${(0.7 + 0.3 * tw).toFixed(2)})`;
+                    ctx.beginPath();
+                    ctx.arc(s.x, s.y, s.r * 0.65, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Subtle astronomical 4-point diffraction spikes on the brightest stars
+                    if (s.hero) {
+                        const sp = s.r * (4.2 + 1.8 * tw);
+                        ctx.strokeStyle = `rgba(${cr},${cg},${cb},${(0.32 * tw).toFixed(2)})`;
+                        ctx.lineWidth = 0.8;
+                        ctx.beginPath();
+                        ctx.moveTo(s.x - sp, s.y); ctx.lineTo(s.x + sp, s.y);
+                        ctx.moveTo(s.x, s.y - sp); ctx.lineTo(s.x, s.y + sp);
+                        ctx.stroke();
+                    }
+                }
+            }
+
+            function stopLoop() {
+                if (timerId) { clearInterval(timerId); timerId = null; }
+            }
+
+            syncStarfieldState = () => {
+                const active = document.body.classList.contains('theme-dark') && !document.hidden;
+                if (active) {
+                    if (!bgBuffer || bgBuffer.width !== window.innerWidth || bgBuffer.height !== window.innerHeight) {
+                        buildSky();
+                    }
+                    if (!timerId) {
+                        const start = performance.now();
+                        timerId = setInterval(() => {
+                            drawFrame((performance.now() - start) * 0.001);
+                        }, 110); // ~9 FPS gentle scintillation, <1% CPU
+                    }
+                } else {
+                    stopLoop();
+                }
+            };
+
+            let resizeDebounce = null;
+            window.addEventListener('resize', () => {
+                if (!document.body.classList.contains('theme-dark')) return;
+                clearTimeout(resizeDebounce);
+                resizeDebounce = setTimeout(() => buildSky(), 180);
+            });
+            document.addEventListener('visibilitychange', syncStarfieldState);
+            syncStarfieldState();
         })();
 
